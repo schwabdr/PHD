@@ -14,13 +14,10 @@ class Configuration:
         self.parser.add_argument('--nat-label-train', type=str, help='natural training label', default='./data/train_labels.npy')
         self.parser.add_argument('--nat-img-test', type=str, help='natural test data', default='./data/test_images.npy')
         self.parser.add_argument('--nat-label-test', type=str, help='natural test label', default='./data/test_labels.npy')
-
         self.parser.add_argument('--SAVE-MODEL-PATH', type=str, help='path to save trained models to', default='./models/saved/')
 
         self.parser.add_argument('--batch-size', type=int, default=256, metavar='N', help='input batch size for training (default: 128)')
-                    #as always, I'm changing the epochs for getting the code up and running
-                    #default was 100, I'm making it 5 just to get everything running.
-        self.parser.add_argument('--epochs', type=int, default=100, metavar='N', help='number of epochs to train')
+        self.parser.add_argument('--epochs', type=int, default=120, metavar='N', help='number of epochs to train')
         self.parser.add_argument('--weight-decay', '--wd', default=2e-4, type=float, metavar='W')
         self.parser.add_argument('--lr', type=float, default=1e-1, metavar='LR', help='learning rate')
         self.parser.add_argument('--momentum', type=float, default=0.9, metavar='M', help='SGD momentum')

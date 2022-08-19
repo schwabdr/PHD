@@ -1,3 +1,11 @@
+'''
+conda env phd04 - here's what I've done - pytorch 1.12 - I hope this keeps working.
+
+conda install pytorch torchvision torchaudio cudatoolkit=10.2 -c pytorch
+conda install matplotlib
+conda install -c conda-forge torchinfo
+'''
+
 from utils import dataload
 from utils import utils
 from utils import config

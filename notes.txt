@@ -1,0 +1,35 @@
+################## CURRENT WORK ##################
+1) TRAIN RESNET18 FOR CIFAR 10 - NO AT
+
+
+################## NORMALIZATION ##################
+https://github.com/ernoult/scalingDTP/pull/36
+And also see:
+https://github.com/kuangliu/pytorch-cifar/issues/19
+
+################## CONDA ENVIRONMENT ##################
+conda env phd04 - here's what I've done - pytorch 1.12 - I hope this keeps working.
+
+conda install pytorch torchvision torchaudio cudatoolkit=10.2 -c pytorch
+conda install matplotlib
+conda install -c conda-forge torchinfo
+
+
+
+
+
+
+################## CODE SNIPPETS ##################
+img, label = trainset.__getitem__(0)
+    min = torch.min(img)
+    max = torch.max(img)
+    for i in range(trainset.__len__()):
+        img, label = trainset.__getitem__(i)
+        min_i = torch.min(img)
+        max_i = torch.max(img)
+        if min_i < min:
+            min = min_i
+        if max_i > max:
+            max = max_i
+    print(f"min: {torch.min(img)}")
+    print(f"max: {torch.max(img)}")
