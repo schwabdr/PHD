@@ -19,3 +19,11 @@ My Goals:
 <li>Can we craft adversarial examples that were crafted from the estimator networks with the goal of reducing the effectiveness of the AT for the target network</li>
 </ol>
 
+Notes For running this project (primarily for myself right now). 
+<ol>
+<li>Download the CIFAR dataset and put in data folder (decompress file with terminal). (http://www.cs.toronto.edu/~kriz/cifar.html) </li>
+<li>Run setup_CIFAR10.py to manipulate raw data into numpy arrays on disk.</li>
+<li>Run train_standard_C10.py, make note of the name you give for the trained model. This will train a ResNet18 on CIFAR10 clean samples.</li>
+<li>Run create_adv_examples.py. This script will create multiple datasets of adversarial examples. It will keep correct labels for each image. np array format again.</li>
+<li>Run train_at_C10.py, this file will create a new ResNet18 model, adversarially trained using standard AT (not the MIAT method). Again make a note of the name you give this model, you will need it later.</li>
+</ol>
