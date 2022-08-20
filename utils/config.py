@@ -1,9 +1,9 @@
-import argparse
-
 '''
 A class to centralize all the parameters that we can set.
-I *think* these can be set from the comman line if you don't want to use the default
+I *think* these can be set from the command line if you don't want to use the default
 '''
+import argparse
+
 class Configuration:
     def __init__(self):
         self.parser = argparse.ArgumentParser(description='PyTorch CIFAR TRADES Adversarial Training')

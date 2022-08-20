@@ -8,27 +8,17 @@ and also see:
 https://github.com/kuangliu/pytorch-cifar/issues/19
 
 '''
-
-import os
+# I removed a bunch of imports that I *think* were not being used. Need to double check this.
 import argparse
 import torch
-# import torch.nn as nn
 import torch.nn.functional as F
-# import torchvision
 import torch.optim as optim
-from torchvision import datasets, transforms
+from torchvision import transforms
 
 import torchvision.models as models
-import torchvision.datasets as datasets
 
-#from models.wideresnet import WideResNet
-#from models.resnet import ResNet18
-#from utils.standard_loss import standard_loss
 import torch.backends.cudnn as cudnn
-from torch.autograd import Variable #deprecated??
-#from data import data_dataset
 import numpy as np
-import random
 
 from utils import utils
 from utils import config
