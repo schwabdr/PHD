@@ -1,3 +1,9 @@
+################## INFORMATION ##################
+I see now that they define a special forward function for resnet_new.py
+They can accept which layer's output they want to return ... and therefore they use this model
+as the encoder. This will help me understand the paper a bit better now. The encoder is one of the outer layers
+of the resnet model.
+
 ################## CURRENT WORK ##################
 1) TRAIN RESNET18 FOR CIFAR 10 - NO AT
 

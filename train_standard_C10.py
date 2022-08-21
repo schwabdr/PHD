@@ -23,12 +23,14 @@ import numpy as np
 from utils import utils
 from utils import config
 from utils import data 
+from models.resnet_new import ResNet18
 
 from torchinfo import summary
 
 args = config.Configuration().getArgs()
 
-resnet = models.resnet18(weights=None) #use pretrained=False for older version of PyTorch
+#resnet = models.resnet18(weights=None) #use pretrained=False for older version of PyTorch
+resnet = ResNet18(10)
 
 print(f"Preparing to train a ResNet18 Model on CIFAR10 dataset ...")
 
@@ -120,6 +122,8 @@ def main():
         transforms.Normalize(*stats)
     ])
     #now I need to pull in the data and create the dataloaders
+    # this link states that we do indeed move the data out of the range [0,1] - so I guess this is correct.
+    # https://www.kaggle.com/code/fanbyprinciple/cifar10-explanation-with-pytorch
     # min: -1.9259666204452515
     # max: 2.130864143371582
 
@@ -153,8 +157,9 @@ def main():
         test_loss, test_accuracy = eval_test(model, device, test_loader)
         print(64*'=')
     
-    print("Saving resnet model 'resnet18-120' ...")
-    utils.save_model(model, 'resnet18-120')
+    model_name = 'resnet-new-100'
+    print(f"Saving resnet model '{model_name}' ...")
+    utils.save_model(model, model_name)
     print("Save Complete. Exiting ...")
 
     print(f"Training Complete. Exiting ...")

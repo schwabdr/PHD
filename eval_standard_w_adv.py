@@ -8,12 +8,14 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import transforms
+import torchvision.models as models
 
 import numpy as np
 
 from utils import config
 from utils import data
 import projected_gradient_descent as pgd
+from models.resnet_new import ResNet18
 
 #next is only needed to visualize samples
 import matplotlib
@@ -36,9 +38,9 @@ def eval_test_w_adv(model, device, test_loader):
     eps_iter = .05
     nb_iter = 50
     '''
-    eps = .3
-    eps_iter = .05
-    nb_iter = 30
+    eps = 8/255.
+    eps_iter = .007
+    nb_iter = 40
     print(f"Using PGD with eps: {eps}, eps_iter: {eps_iter}, nb_iter: {nb_iter}")
     first = True
     #with torch.no_grad():
@@ -74,6 +76,7 @@ def eval_test_w_adv(model, device, test_loader):
         test_loss += F.cross_entropy(output, target, reduction='sum').item()
         pred = output.max(1, keepdim=True)[1]
         pred_adv = output_adv.max(1, keepdim=True)[1]
+        #print(f"pred: {pred}, pred_adv{pred_adv}")
         correct += pred.eq(target.view_as(pred)).sum().item()
         correct_adv += pred_adv.eq(target.view_as(pred_adv)).sum().item()
         
@@ -95,13 +98,13 @@ def eval_test_w_adv(model, device, test_loader):
                 for k in range(0,10,2):
                     #get a random index
                     i = lst.pop()
-                    
                     axes1[j][k].set_axis_off()
                     axes1[j][k+1].set_axis_off()
                     axes1[j][k].imshow(x[i],interpolation='nearest')
                     axes1[j][k].text(0,0,classes[target[i]]) # this gets the point accross but needs fixing.
                     axes1[j][k+1].imshow(x_adv[i], interpolation='nearest')
-                    axes1[j][k+1].text(0,0,classes[pred_adv[i]])
+                    pred_ind = pred_adv[i]
+                    axes1[j][k+1].text(0,0,classes[pred_ind])
             plt.show()    
             
     test_loss /= len(test_loader.dataset)
@@ -114,7 +117,6 @@ def eval_test_w_adv(model, device, test_loader):
     return test_loss, test_accuracy
 
 
-
 def main():
     print("Beginning Evaluation ...")
 
@@ -122,10 +124,34 @@ def main():
 
     device = torch.device("cuda" if use_cuda else "cpu")
 
-    #TODO add choice to specify two models, one to generate examples, and one to evaluate.
+    #TODO add choice to specify two models, one to generate examples, and one to evaluate, i.e. blackbox evaluation
     # for now we just use one model.
-    name = 'resnet18-120' #input("Name of model to load: ") #for now I'll hard code the only model I have trained
-    model = torch.load(os.path.join(args.SAVE_MODEL_PATH, name))
+    name = 'resnet-new-100' #input("Name of model to load: ") #for now I'll hard code the only model I have trained
+    #model = models.resnet18()
+    model = ResNet18(10)
+    path = str(os.path.join(args.SAVE_MODEL_PATH, name))
+    
+    '''
+    #this block of code is good to know - if I want to load the state_dict and make any changes
+    #note than an optimizer can also have it's state_dict saved
+    state_dic = torch.load(path)
+    new_state = model.state_dict()
+
+    for k in state_dic.keys():
+        if k in new_state.keys():
+            new_state[k] = state_dic[k]
+            # print(k)
+        else:
+            break
+
+    model.load_state_dict(new_state)
+    '''
+    #model=model.to(device)
+    
+    #print(f"Loading from {path}")
+    model.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, name)))
+    model.to(device)
+    model.eval()
     print(f"Model loaded: {name}")
 
     #https://www.kaggle.com/code/kmldas/cifar10-resnet-90-accuracy-less-than-5-min/notebook

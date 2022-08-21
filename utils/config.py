@@ -17,11 +17,15 @@ class Configuration:
         self.parser.add_argument('--SAVE-MODEL-PATH', type=str, help='path to save trained models to', default='./models/saved/')
 
         self.parser.add_argument('--batch-size', type=int, default=256, metavar='N', help='input batch size for training (default: 128)')
-        self.parser.add_argument('--epochs', type=int, default=120, metavar='N', help='number of epochs to train')
+        self.parser.add_argument('--epochs', type=int, default=100, metavar='N', help='number of epochs to train')
         self.parser.add_argument('--weight-decay', '--wd', default=2e-4, type=float, metavar='W')
         self.parser.add_argument('--lr', type=float, default=1e-1, metavar='LR', help='learning rate')
         self.parser.add_argument('--momentum', type=float, default=0.9, metavar='M', help='SGD momentum')
         self.parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
+        
+        #MI specific values
+        self.parser.add_argument('--lr-mi', type=float, default=1e-2, metavar='LR', help='learning rate')
+
 
         self.parser.add_argument('--epsilon', default=8/255, help='perturbation')
         self.parser.add_argument('--num-steps', default=10, help='perturb number of steps')
@@ -31,8 +35,24 @@ class Configuration:
         self.parser.add_argument('--log-interval', type=int, default=50, metavar='N', help='how many batches to wait before logging training status')
         self.parser.add_argument('--model-dir', default='./checkpoint/wideresnet/standard_AT', help='directory of model for saving checkpoint')
         self.parser.add_argument('--save-freq', '-s', default=2, type=int, metavar='N', help='save frequency')
+        self.parser.add_argument('--print_freq', default=50, type=int)
+        #2 more paths from train_MI_estimator
+        #self.parser.add_argument('--pre-target', default='./checkpoint/resnet_18/standard_AT/best_model.pth', help='directory of model for saving checkpoint')
+        #self.parser.add_argument('--model-dir', default='./checkpoint/resnet_18/MI_estimator/alpha', help='directory of model for saving checkpoint')
 
-    
+
+
+        #more from train_MI_estimator
+        self.parser.add_argument('--va-mode', choices=['nce', 'fd', 'dv'], default='dv')
+        self.parser.add_argument('--va-fd-measure', default='JSD')
+        self.parser.add_argument('--va-hsize', type=int, default=2048)
+        self.parser.add_argument('--is_internal', type=bool, default=False)
+        self.parser.add_argument('--is_internal_last', type=bool, default=False)
+
+        self.stats = ((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)) #mean and stdev
 
     def getArgs(self):
         return self.parser.parse_args()
+
+    def getNormStats(self):
+        return self.stats

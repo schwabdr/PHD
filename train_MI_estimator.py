@@ -1,5 +1,15 @@
 # This version max Natural MI of x and max Adversarial MI of x_adv
 
+#TODO
+'''
+1) remove Accuracy and Robust Accuracy between every Epoch
+2) Create the adversarial examples ONCE and save them for usage in all EPOCHS
+3) This will greatly speed up the execution time.
+4) explore meaning of "wrong" and "right" samples - printed every 50 iters
+5) What do the MI values mean?
+6) if this training ever finishes - save the models on disk with a new name
+'''
+
 import os
 import argparse
 import numpy as np
@@ -8,57 +18,48 @@ from torch.optim import lr_scheduler, Adam
 
 import torch
 import torch.nn.functional as F
-from torchvision import datasets, transforms
+from torchvision import transforms
+import torchvision.models as models
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
 
-from data import data_dataset
-#from models.resnet_new import ResNet18
+from utils.data import data_dataset
+
+from models.resnet_new import ResNet18
 
 from models.estimator import Estimator
 from models.discriminators import MI1x1ConvNet, MIInternalConvNet, MIInternallastConvNet
 from compute_MI import compute_loss
 
-parser = argparse.ArgumentParser(description='PyTorch CIFAR MI AT')
+from utils import config
+from utils import utils
 
-parser.add_argument('--nat-img-train', type=str, help='natural training data', default='./data/train_images.npy')
-parser.add_argument('--nat-label-train', type=str, help='natural training label', default='./data/train_labels.npy')
-parser.add_argument('--nat-img-test', type=str, help='natural test data', default='./data/test_images.npy')
-parser.add_argument('--nat-label-test', type=str, help='natural test label', default='./data/test_labels.npy')
-parser.add_argument('--SAVE-MODEL-PATH', type=str, help='path to save trained models to', default='./models/saved/')
+import projected_gradient_descent as pgd # for attacks
 
+
+args = config.Configuration().getArgs()
+stats = config.Configuration().getNormStats() 
+
+#override the default values from config file
+args.batch_size = 200
+args.epochs = 50
+args.save_freq = 1
+'''
 parser.add_argument('--batch-size', type=int, default=200, metavar='N',
                     help='input batch size for training (default: 128)')
 parser.add_argument('--epochs', type=int, default=50, metavar='N',
                     help='number of epochs to train')
 parser.add_argument('--lr-mi', type=float, default=1e-2, metavar='LR',
                     help='learning rate')
+'''
+#for PGD
+eps = 8/255. #approx .0314
+eps_iter = .007
+nb_iter = 40
 
-parser.add_argument('--epsilon', default=8/255,
-                    help='perturbation')
-parser.add_argument('--num-steps', default=20,
-                    help='perturb number of steps')
-parser.add_argument('--step-size', default=0.007,
-                    help='perturb step size')
+print(f"Using PGD with eps: {eps}, eps_iter: {eps_iter}, nb_iter: {nb_iter}")
 
-parser.add_argument('--pre-target', default='./checkpoint/resnet_18/standard_AT/best_model.pth',
-                    help='directory of model for saving checkpoint')
-
-parser.add_argument('--va-mode', choices=['nce', 'fd', 'dv'], default='dv')
-parser.add_argument('--va-fd-measure', default='JSD')
-parser.add_argument('--va-hsize', type=int, default=2048)
-parser.add_argument('--is_internal', type=bool, default=False)
-parser.add_argument('--is_internal_last', type=bool, default=False)
-
-parser.add_argument('--seed', type=int, default=1, metavar='S',
-                    help='random seed (default: 1)')
-parser.add_argument('--model-dir', default='./checkpoint/resnet_18/MI_estimator/alpha',
-                    help='directory of model for saving checkpoint')
-parser.add_argument('--print_freq', default=50, type=int)
-parser.add_argument('--save-freq', default=1, type=int, metavar='N', help='save frequency')
-
-args = parser.parse_args()
-
+print(f"Total Epochs: {args.epochs}")
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -83,69 +84,10 @@ def setup_seed(seed):
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
 
-''' #not used
-def make_optimizer(model, lr):
-    optimizer = Adam(model.parameters(), lr)
-    return optimizer
-'''
-
 def make_optimizer_and_schedule(model, lr):
     optimizer = Adam(model.parameters(), lr)
     schedule = lr_scheduler.MultiStepLR(optimizer, milestones=[20, 30, 40], gamma=0.5)
     return optimizer, schedule
-
-
-def craft_adversarial_example_pgd(model, x_natural, y, step_size=0.007,
-                epsilon=0.031, perturb_steps=20, distance='l_inf'):
-    model.eval()
-
-    x_adv = x_natural.detach() + 0.001 * torch.randn(x_natural.shape).cuda().detach()
-
-    if distance == 'l_inf':
-        for _ in range(perturb_steps):
-            x_adv.requires_grad_()
-            with torch.enable_grad():
-                logits = model(x_adv)
-                loss_ce = F.cross_entropy(logits, y)
-
-            grad = torch.autograd.grad(loss_ce, [x_adv])[0]
-            x_adv = x_adv.detach() + step_size * torch.sign(grad.detach())
-            x_adv = torch.min(torch.max(x_adv, x_natural - epsilon), x_natural + epsilon)
-            x_adv = torch.clamp(x_adv, 0.0, 1.0)
-    elif distance == 'l_2':
-        batch_size = len(x_natural)
-        delta = 0.001 * torch.randn(x_natural.shape).cuda().detach()
-        delta = Variable(delta.data, requires_grad=True)
-
-        # Setup optimizers
-        optimizer_delta = optim.SGD([delta], lr=epsilon / perturb_steps * 2)
-
-        for _ in range(perturb_steps):
-            adv = x_natural + delta
-
-            # optimize
-            optimizer_delta.zero_grad()
-            with torch.enable_grad():
-                loss = (-1) * F.cross_entropy(model(adv), y)
-            loss.backward()
-            # renorming gradient
-            grad_norms = delta.grad.view(batch_size, -1).norm(p=2, dim=1)
-            delta.grad.div_(grad_norms.view(-1, 1, 1, 1))
-            # avoid nan or inf if gradient is 0
-            if (grad_norms == 0).any():
-                delta.grad[grad_norms == 0] = torch.randn_like(delta.grad[grad_norms == 0])
-            optimizer_delta.step()
-
-            # projection
-            delta.data.add_(x_natural)
-            delta.data.clamp_(0, 1).sub_(x_natural)
-            delta.data.renorm_(p=2, dim=0, maxnorm=epsilon)
-        x_adv = Variable(x_natural + delta, requires_grad=False)
-    else:
-        x_adv = torch.clamp(x_adv, 0.0, 1.0)
-
-    return x_adv
-
 
 def MI_loss_nat(i, model, x_natural, y, x_adv, local_n, global_n, epoch):
     model.eval()
@@ -200,14 +142,15 @@ def MI_loss_adv(i, model, x_natural, y, x_adv, local_n, global_n, epoch):
 def evaluate_mi_nat(encoder, x_natural, y, x_adv, local_n, global_n):
 
     encoder.eval()
-    local_n.eval()
-    global_n.eval()
+    local_n.eval() #from DIM?
+    global_n.eval() #from DIM?
 
     pesudo_label = F.softmax(encoder(x_natural), dim=0).max(1, keepdim=True)[1].squeeze()
     index = (pesudo_label == y)
     pesudo_label = F.softmax(encoder(x_adv), dim=0).max(1, keepdim=True)[1].squeeze()
     index = index * (pesudo_label != y)
 
+    #torch.nonzero() gives a Tensor containing indices of all non-zero elements
     loss_n = (compute_loss(args=args, former_input=x_natural, latter_input=x_natural, encoder=encoder,
                         dim_local=local_n, dim_global=global_n, v_out=True) * index).sum()/torch.nonzero(index).size(0)
 
@@ -256,10 +199,10 @@ def eval_test(model, device, test_loader, local_n, global_n, local_a, global_a):
     for data, target in test_loader:
         cnt += 1
         data, target = data.to(device), target.to(device)
-        data_adv = craft_adversarial_example_pgd(model=model, x_natural=data, y=target,
-                                             step_size=0.007, epsilon=8/255,
-                                             perturb_steps=40, distance='l_inf')
-
+        #data_adv = craft_adversarial_example_pgd(model=model, x_natural=data, y=target,
+        #                                     step_size=0.007, epsilon=8/255,
+        #                                     perturb_steps=40, distance='l_inf')
+        data_adv = pgd.projected_gradient_descent(model, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf,y=target, targeted=False)
         with torch.no_grad():
             output = model(data)
             output_adv = model(data_adv)
@@ -294,32 +237,17 @@ def eval_test(model, device, test_loader, local_n, global_n, local_a, global_a):
 
 def main():
     # settings
-    setup_seed(args.seed)
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
-
+    setup_seed(42) #best seed ever
+    
     if not os.path.exists(args.model_dir):
         os.makedirs(args.model_dir)
-    device = torch.device("cuda")
+    
+    use_cuda = torch.cuda.is_available()
+    device = torch.device("cuda" if use_cuda else "cpu")
 
-    # setup data loader
-    trans_train = transforms.Compose([
-        transforms.RandomCrop(32, padding=4),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor()
-    ])
+    print(f"device: {device}") #sanity check - using GPU
 
-    trans_test = transforms.Compose([
-        transforms.ToTensor()
-    ])
-
-    trainset = data_dataset(img_path=args.nat_img_train, clean_label_path=args.nat_label_train,
-                            transform=trans_train)
-    train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, drop_last=False,
-                                               shuffle=True, num_workers=4, pin_memory=True)
-    testset = data_dataset(img_path=args.nat_img_test, clean_label_path=args.nat_label_test, transform=trans_test)
-    test_loader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, drop_last=False, shuffle=False,
-                                              num_workers=4, pin_memory=True)
-
+    
     # load MI estimation model
 
     # Estimator part 1: X or layer3 to H space
@@ -342,23 +270,17 @@ def main():
         global_a = MI1x1ConvNet(z_size, args.va_hsize)
 
     print('----------------Start training-------------')
-    #target_model = ResNet18(10)
-    name = 'resnet18-120' #input("Name of model to load: ") #for now I'll hard code the only model I have trained
-    target_model = torch.load(os.path.join(args.SAVE_MODEL_PATH, name))
-    
-    state_dic = torch.load(args.pre_target)
-    new_state = target_model.state_dict()
+    target_model = ResNet18(10)
+    name = 'resnet-new-5' #input("Name of model to load: ") #for now I'll hard code so I don't have to retype the name while prototyping
+    #target_model = target_model.load_statetorch.load(os.path.join(args.SAVE_MODEL_PATH, name))
+    #target_model = model = models.resnet18()
+    target_model.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, name)))
+    target_model.to(device)
+    target_model.eval()
 
-    for k in state_dic.keys():
-        if k in new_state.keys():
-            new_state[k] = state_dic[k]
-            # print(k)
-        else:
-            break
 
-    target_model.load_state_dict(new_state)
-
-    target_model = torch.nn.DataParallel(target_model).cuda()
+    #target_model = torch.nn.DataParallel(target_model).cuda() #don't think I need this for eval
+    #target_model.eval()
 
     local_n = torch.nn.DataParallel(local_n).cuda()
     global_n = torch.nn.DataParallel(global_n).cuda()
@@ -367,10 +289,31 @@ def main():
 
     cudnn.benchmark = True
 
+    #_,_ = make_optimizer_and_schedule(target_model, lr=args.lr_mi)
     opt_local_n, schedule_local_n = make_optimizer_and_schedule(local_n, lr=args.lr_mi)
     opt_global_n, schedule_global_n = make_optimizer_and_schedule(global_n, lr=args.lr_mi)
     opt_local_a, schedule_local_a = make_optimizer_and_schedule(local_a, lr=args.lr_mi)
     opt_global_a, schedule_global_a = make_optimizer_and_schedule(global_a, lr=args.lr_mi)
+
+
+    # setup data loader - should we normalize again? I think so for consistency.
+    trans_train = transforms.Compose([
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize(*stats, inplace=False)
+    ])
+
+    trans_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(*stats, inplace=False)
+    ])
+
+    #set up data loaders for the original clean CIFAR images
+    trainset = data_dataset(img_path=args.nat_img_train, clean_label_path=args.nat_label_train, transform=trans_train)
+    train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, drop_last=False,shuffle=True, num_workers=4, pin_memory=True)
+    testset = data_dataset(img_path=args.nat_img_test, clean_label_path=args.nat_label_test, transform=trans_test)
+    test_loader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, drop_last=False, shuffle=False, num_workers=4, pin_memory=True)
 
     # Train
     for epoch in range(1, args.epochs + 1):
@@ -379,10 +322,8 @@ def main():
 
         for batch_idx, (data, target) in enumerate(train_loader):
             data, target = data.to(device), target.to(device)
-
-            # craft adversarial examples
-            adv = craft_adversarial_example_pgd(model=target_model, x_natural=data, y=target)
-
+            # craft adversarial examples - using PGD from CleverHans
+            adv = pgd.projected_gradient_descent(target_model, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf,y=target, targeted=False)
             # Train MI estimator
             loss_n = MI_loss_nat(i=batch_idx, model=target_model, x_natural=data, y=target, x_adv=adv,
                            local_n=local_n, global_n=global_n, epoch=epoch)
@@ -443,6 +384,12 @@ def main():
 
         print('================================================================')
 
+    print("Saving estimator models ...")
+    utils.save_model(local_n, 'local_n')
+    utils.save_model(global_n, 'global_n')
+    utils.save_model(local_a, 'local_a')
+    utils.save_model(global_a, 'global_a')
+    print("Save Complete. Exiting ...")
 
 if __name__ == '__main__':
     main()

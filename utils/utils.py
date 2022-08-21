@@ -48,9 +48,11 @@ def displayRandomImgGrid(X, Y, classes, rows=5, cols=5, Y_hat=None):
 
 #this is from the old blackbox CIFAR10 code utils.py file.
 #save a model to disk to reuse it after it's been trained
-#note that a model can simply be loaded with 
+#note that a model can simply be loaded with
 # model = torch.load(os.path.join(args.SAVE_MODEL_PATH, bb))
 # where bb is the name of the saved model to load
+# it may be a bit more complex than that ...
+# see here: https://pytorch.org/tutorials/beginner/saving_loading_models.html
 def save_model(model, name=None):
     if not os.path.exists(args.SAVE_MODEL_PATH):
         os.mkdir(args.SAVE_MODEL_PATH)
@@ -67,7 +69,8 @@ def save_model(model, name=None):
             break
     else:
         filename = name #dangerous - will overwrite model - but this prevents losing a trained model when I DC
-    torch.save(model, os.path.join(args.SAVE_MODEL_PATH, filename))
+    # had to use model.module instead of model b/c it's a parallel trained model.
+    torch.save(model.module.state_dict(), os.path.join(args.SAVE_MODEL_PATH, filename))
 
 #utility to verify cuda information for current hardware environment
 def print_cuda_info():
