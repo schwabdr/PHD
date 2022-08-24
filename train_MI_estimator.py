@@ -24,6 +24,7 @@ import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
 
 from utils.data import data_dataset
+from utils.data import data_adv_dataset
 
 from models.resnet_new import ResNet18
 
@@ -34,11 +35,19 @@ from compute_MI import compute_loss
 from utils import config
 from utils import utils
 
-import projected_gradient_descent as pgd # for attacks
+#import projected_gradient_descent as pgd # for attacks
+
+#next is only needed to visualize samples
+import matplotlib
+matplotlib.use('tkagg')
+import matplotlib.pyplot as plt
+
+import random
 
 
 args = config.Configuration().getArgs()
 stats = config.Configuration().getNormStats() 
+classes = config.Configuration().getClasses()
 
 #override the default values from config file
 args.batch_size = 200
@@ -195,14 +204,37 @@ def eval_test(model, device, test_loader, local_n, global_n, local_a, global_a):
     losses_a_n = 0
     losses_a_a = 0
 
-
-    for data, target in test_loader:
+    first = False
+    for data, data_adv, target in test_loader:
         cnt += 1
-        data, target = data.to(device), target.to(device)
-        #data_adv = craft_adversarial_example_pgd(model=model, x_natural=data, y=target,
-        #                                     step_size=0.007, epsilon=8/255,
-        #                                     perturb_steps=40, distance='l_inf')
-        data_adv = pgd.projected_gradient_descent(model, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf,y=target, targeted=False)
+        data, data_adv, target = data.to(device), data_adv.to(device), target.to(device)
+        #TODO move this block of code into a function in utils. I've copied it so many times now.
+        if first: #False to block out this section of code for now.
+            first = False
+            x = data.detach().cpu().numpy().transpose(0,2,3,1)
+            x_adv = data_adv.detach().cpu().numpy().transpose(0,2,3,1)
+            pred = target.detach().cpu().numpy()
+            #goal here is to randomly display an image and it's adverarial example
+            x = np.clip(((x * stats[1]) + stats[0]),0,1.)
+            x_adv = np.clip(((x_adv * stats[1]) + stats[0]),0,1.)
+            rows = 5
+            cols = 10
+            fig, axes1 = plt.subplots(rows,cols,figsize=(5,5))
+            lst = list(range(0, len(x)))
+            random.shuffle(lst)
+            #print("min/max of numpy arrays: ", np.min(x), np.max(x)) #this was very close to 0 and 1
+            for j in range(5):
+                for k in range(0,10,2):
+                    #get a random index
+                    i = lst.pop()
+                    axes1[j][k].set_axis_off()
+                    axes1[j][k+1].set_axis_off()
+                    axes1[j][k].imshow(x[i],interpolation='nearest')
+                    axes1[j][k].text(0,0,classes[target[i]]) # this gets the point accross but needs fixing.
+                    axes1[j][k+1].imshow(x_adv[i], interpolation='nearest')
+                    pred_ind = pred[i]
+                    axes1[j][k+1].text(0,0,classes[pred_ind])
+            plt.show()  
         with torch.no_grad():
             output = model(data)
             output_adv = model(data_adv)
@@ -249,23 +281,26 @@ def main():
 
     # setup data loader - should we normalize again? I think so for consistency.
     trans_train = transforms.Compose([
-        transforms.RandomCrop(32, padding=4),
-        transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        transforms.Normalize(*stats, inplace=False)
+        transforms.Normalize(*stats, inplace=True)
     ])
 
     trans_test = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize(*stats, inplace=False)
     ])
-
+    '''
     #set up data loaders for the original clean CIFAR images
     trainset = data_dataset(img_path=args.nat_img_train, clean_label_path=args.nat_label_train, transform=trans_train)
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, drop_last=False,shuffle=True, num_workers=4, pin_memory=True)
     testset = data_dataset(img_path=args.nat_img_test, clean_label_path=args.nat_label_test, transform=trans_test)
     test_loader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, drop_last=False, shuffle=False, num_workers=4, pin_memory=True)
-    
+    '''
+    trainset = data_adv_dataset(img_path=args.nat_img_train, adv_img_path=args.adv_img_train,clean_label_path=args.nat_label_train, transform=trans_train, augment=True)
+    train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, drop_last=False,shuffle=True, num_workers=4, pin_memory=True)
+    testset = data_adv_dataset(img_path=args.nat_img_test, adv_img_path=args.adv_img_test, clean_label_path=args.nat_label_test, transform=trans_test, augment=False)
+    test_loader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, drop_last=False, shuffle=False, num_workers=4, pin_memory=True)
+
     # load MI estimation model
 
     # Estimator part 1: X or layer3 to H space
@@ -290,15 +325,17 @@ def main():
     print('----------------Start training-------------')
     target_model = ResNet18(10)
     name = 'resnet-new-100' #input("Name of model to load: ") #for now I'll hard code so I don't have to retype the name while prototyping
+    print(f"Target Model Loaded (encoder): {name}")
     #target_model = target_model.load_statetorch.load(os.path.join(args.SAVE_MODEL_PATH, name))
     #target_model = model = models.resnet18()
     target_model.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, name)))
     target_model.to(device)
-    target_model.eval()
-
-
-    #target_model = torch.nn.DataParallel(target_model).cuda() #don't think I need this for eval
     #target_model.eval()
+
+
+    #I'm going to leave it in - hope it works (next two lines were commented out by me ...)
+    target_model = torch.nn.DataParallel(target_model).cuda() #don't think I need this for eval
+    target_model.eval()
 
     local_n = torch.nn.DataParallel(local_n).cuda()
     global_n = torch.nn.DataParallel(global_n).cuda()
@@ -314,17 +351,51 @@ def main():
     opt_global_a, schedule_global_a = make_optimizer_and_schedule(global_a, lr=args.lr_mi)
 
    
+    first = False
     # Train
     for epoch in range(1, args.epochs + 1):
         loss_n_all = 0
         loss_a_all = 0
 
-        for batch_idx, (data, target) in enumerate(train_loader):
-            data, target = data.to(device), target.to(device)
+        for batch_idx, (data, data_adv, target) in enumerate(train_loader):
+            data, data_adv, target = data.to(device), data_adv.to(device), target.to(device)
             # craft adversarial examples - using PGD from CleverHans
-            adv = pgd.projected_gradient_descent(target_model, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf,y=target, targeted=False)
+            # now adv is taken from the train_loader
+            # adv = pgd.projected_gradient_descent(target_model, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf,y=target, targeted=False)
+            #SANITY CHECK
+            #make sure images line up:
+            #TODO move this block of code into a function in utils. I've copied it so many times now.
+            if first: #False to block out this section of code for now.
+                first = False
+                x = data.detach().cpu().numpy().transpose(0,2,3,1)
+                x_adv = data_adv.detach().cpu().numpy().transpose(0,2,3,1)
+                pred = target.detach().cpu().numpy()
+                #goal here is to randomly display an image and it's adverarial example
+                x = np.clip(((x * stats[1]) + stats[0]),0,1.)
+                x_adv = np.clip(((x_adv * stats[1]) + stats[0]),0,1.)
+                rows = 5
+                cols = 10
+                fig, axes1 = plt.subplots(rows,cols,figsize=(5,5))
+                lst = list(range(0, len(x)))
+                random.shuffle(lst)
+                #print("min/max of numpy arrays: ", np.min(x), np.max(x)) #this was very close to 0 and 1
+                for j in range(5):
+                    for k in range(0,10,2):
+                        #get a random index
+                        i = lst.pop()
+                        axes1[j][k].set_axis_off()
+                        axes1[j][k+1].set_axis_off()
+                        axes1[j][k].imshow(x[i],interpolation='nearest')
+                        axes1[j][k].text(0,0,classes[target[i]]) # this gets the point accross but needs fixing.
+                        axes1[j][k+1].imshow(x_adv[i], interpolation='nearest')
+                        pred_ind = pred[i]
+                        axes1[j][k+1].text(0,0,classes[pred_ind])
+                plt.show()   
+
+
+
             # Train MI estimator
-            loss_n = MI_loss_nat(i=batch_idx, model=target_model, x_natural=data, y=target, x_adv=adv,
+            loss_n = MI_loss_nat(i=batch_idx, model=target_model, x_natural=data, y=target, x_adv=data_adv,
                            local_n=local_n, global_n=global_n, epoch=epoch)
 
             loss_n_all += loss_n
@@ -335,7 +406,7 @@ def main():
             opt_local_n.step()
             opt_global_n.step()
 
-            loss_a = MI_loss_adv(i=batch_idx, model=target_model, x_natural=data, y=target, x_adv=adv,
+            loss_a = MI_loss_adv(i=batch_idx, model=target_model, x_natural=data, y=target, x_adv=data_adv,
                                  local_n=local_a, global_n=global_a, epoch=epoch)
             loss_a_all += loss_a
 
@@ -382,7 +453,7 @@ def main():
             print('save the model')
 
         print('================================================================')
-
+    # no need to save target - it is not changed by this process.
     print("Saving estimator models ...")
     utils.save_model(local_n, 'local_n')
     utils.save_model(global_n, 'global_n')

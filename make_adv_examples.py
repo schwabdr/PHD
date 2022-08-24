@@ -129,6 +129,7 @@ def make_examples(model, device, train_loader, test_loader):
     x_adv = np.clip(((x_adv * stats[1]) + stats[0]),0,1.)
     x_adv = (x_adv*255).astype(np.uint8)
     #x_test_adv is now [b][w][h][c] range of [0,255]
+    y_true = y_true.astype(np.uint8)
     
     #c = 0
     first = True
@@ -157,6 +158,7 @@ def make_examples(model, device, train_loader, test_loader):
     x_test_adv = np.clip(((x_test_adv * stats[1]) + stats[0]),0,1.)
     x_test_adv = (x_test_adv*255).astype(np.uint8)
     #x_test_adv is now [b][w][h][c] range of [0,255]
+    y_test_true = y_test_true.astype(np.uint8)
     
 
 
@@ -196,9 +198,10 @@ def main():
     print(f"Model loaded: {name}. Will generate adversarial examples from this model.")
 
     # setup data loader
+    # don't flip the images here!!!
     trans_train = transforms.Compose([
-        transforms.RandomCrop(32, padding=4, padding_mode='reflect'),
-        transforms.RandomHorizontalFlip(),
+        #transforms.RandomCrop(32, padding=4, padding_mode='reflect'),
+        #transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize(*stats, inplace=False) #original code was True here from MIAT - not sure why, just making a note
     ])

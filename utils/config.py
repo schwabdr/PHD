@@ -60,3 +60,6 @@ class Configuration:
 
     def getNormStats(self):
         return self.stats
+
+    def getClasses(self):
+        return ['plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
