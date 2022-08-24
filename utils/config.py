@@ -35,6 +35,11 @@ class Configuration:
         self.parser.add_argument('--num-steps', default=10, help='perturb number of steps')
         self.parser.add_argument('--step-size', default=0.007, help='perturb step size')
 
+        #next three are schwab - use for PGD
+        self.parser.add_argument('--eps', default=8/255, help='perturbation')
+        self.parser.add_argument('--nb-iter', default=40, help='perturb number of steps')
+        self.parser.add_argument('--eps-iter', default=0.007, help='perturb step size')
+
         self.parser.add_argument('--seed', type=int, default=1, metavar='S', help='random seed (default: 1)')
         self.parser.add_argument('--log-interval', type=int, default=50, metavar='N', help='how many batches to wait before logging training status')
         self.parser.add_argument('--model-dir', default='./checkpoint/wideresnet/standard_AT', help='directory of model for saving checkpoint')
@@ -52,6 +57,12 @@ class Configuration:
         self.parser.add_argument('--va-hsize', type=int, default=2048)
         self.parser.add_argument('--is_internal', type=bool, default=False)
         self.parser.add_argument('--is_internal_last', type=bool, default=False)
+
+        #from train_MIAT_alpha
+        self.parser.add_argument('--warm-up', type=bool, default=True, help='warm up the MI estimator')
+        self.parser.add_argument('--warm-epochs', type=int, default=20, metavar='N', help='number of epochs to train')
+        #parser.add_argument('--model-dir', default='./checkpoint/wideresnet/MIAT_standard', help='directory of model for saving checkpoint')
+
 
         self.stats = ((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)) #mean and stdev
 

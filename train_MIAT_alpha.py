@@ -4,7 +4,6 @@ import argparse
 import numpy as np
 import torch.optim as optim
 from torch.optim import lr_scheduler, Adam
-from tqdm import tqdm
 
 import torch
 import torch.nn.functional as F
@@ -13,77 +12,31 @@ import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
 
 from data import data_dataset
-# from models.resnet_new import ResNet18
-from models.wideresnet_new import WideResNet
+from models.resnet_new import ResNet18
+#from models.wideresnet_new import WideResNet
 
 from models.estimator import Estimator
 from models.discriminators import MI1x1ConvNet, MIInternalConvNet, MIInternallastConvNet
 from compute_MI import compute_loss
 
+import projected_gradient_descent as pgd
+
 from utils import config
+from utils import utils
 
 
 stats = config.Configuration().getNormStats() 
 
-parser = argparse.ArgumentParser(description='PyTorch CIFAR MI AT')
+args = config.Configuration().getArgs()
 
-parser.add_argument('--nat-img-train', type=str, help='natural training data', default='./data/train_images.npy')
-parser.add_argument('--nat-label-train', type=str, help='natural training label', default='./data/train_labels.npy')
-parser.add_argument('--nat-img-test', type=str, help='natural test data', default='./data/test_images.npy')
-parser.add_argument('--nat-label-test', type=str, help='natural test label', default='./data/test_labels.npy')
+args.model_dir = './checkpoint/wideresnet/MIAT_standard'
 
-parser.add_argument('--batch-size', type=int, default=256, metavar='N',
-                    help='input batch size for training (default: 128)')
-parser.add_argument('--epochs', type=int, default=100, metavar='N',
-                    help='number of epochs to train')
-# parser.add_argument('--lr-mi', type=float, default=1e-3, metavar='LR',
- #                    help='learning rate')
-parser.add_argument('--lr', type=float, default=1e-1, metavar='LR',
-                    help='learning rate')
-parser.add_argument('--weight-decay', '--wd', default=2e-4,
-                    type=float, metavar='W')
-parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
-                    help='SGD momentum')
+#PGD Parameters
+eps = args.eps
+eps_iter = args.eps_iter
+nb_iter = args.nb_iter
 
-parser.add_argument('--epsilon', default=8/255,
-                    help='perturbation')
-parser.add_argument('--num-steps', default=10,
-                    help='perturb number of steps')
-parser.add_argument('--step-size', default=0.007,
-                    help='perturb step size')
-
-parser.add_argument('--warm-up', type=bool, default=True,
-                    help='warm up the MI estimator')
-parser.add_argument('--warm-epochs', type=int, default=20, metavar='N',
-                    help='number of epochs to train')
-'''
-parser.add_argument('--pretrain-model', default='./checkpoint/resnet_18/ori/best_model.pth',
-                    help='directory of model for saving checkpoint')
-'''
-parser.add_argument('--pre-local-n', default='./checkpoint/resnet_18/MI_estimator/beta_final_l2/local_n_model.pth',
-                    help='directory of model for saving checkpoint')
-parser.add_argument('--pre-global-n', default='./checkpoint/resnet_18/MI_estimator/beta_final_l2/global_n_model.pth',
-                    help='directory of model for saving checkpoint')
-parser.add_argument('--pre-local-a', default='./checkpoint/resnet_18/MI_estimator/beta_final_l2/local_a_model.pth',
-                    help='directory of model for saving checkpoint')
-parser.add_argument('--pre-global-a', default='./checkpoint/resnet_18/MI_estimator/beta_final_l2/global_a_model.pth',
-                    help='directory of model for saving checkpoint')
-
-parser.add_argument('--va-mode', choices=['nce', 'fd', 'dv'], default='dv')
-parser.add_argument('--va-fd-measure', default='JSD')
-parser.add_argument('--va-hsize', type=int, default=2048)
-parser.add_argument('--is_internal', type=bool, default=False)
-parser.add_argument('--is_internal_last', type=bool, default=False)
-
-parser.add_argument('--seed', type=int, default=1, metavar='S',
-                    help='random seed (default: 1)')
-parser.add_argument('--model-dir', default='./checkpoint/wideresnet/MIAT_standard',
-                    help='directory of model for saving checkpoint')
-parser.add_argument('--print_freq', type=int, default=50)
-parser.add_argument('--save-freq', default=2, type=int, metavar='N', help='save frequency')
-
-args = parser.parse_args()
-
+print(f"Using PGD with eps: {eps}, eps_iter: {eps_iter}, nb_iter: {nb_iter}")
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -365,9 +318,8 @@ def eval_test(model, device, test_loader, local_n, global_n, local_a, global_a):
     for data, target in test_loader:
         cnt += 1
         data, target = data.to(device), target.to(device)
-        data_adv = craft_adversarial_example_pgd(model=model, x_natural=data, y=target,
-                                             step_size=0.007, epsilon=8/255,
-                                             perturb_steps=40, distance='l_inf')
+        data_adv = pgd.projected_gradient_descent(model, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf,y=None, targeted=False)
+        #data_adv = craft_adversarial_example_pgd(model=model, x_natural=data, y=target, step_size=0.007, epsilon=8/255, perturb_steps=40, distance='l_inf')
 
         with torch.no_grad():
             output = model(data)
@@ -515,8 +467,8 @@ def main():
             data, target = data.to(device), target.to(device)
 
             # craft adversarial examples
-            adv = craft_adversarial_example_pgd(model=target_model, x_natural=data, y=target, step_size=0.007,
-                                                epsilon=8/255, perturb_steps=40, distance='l_inf')
+            adv = pgd.projected_gradient_descent(model, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf,y=None, targeted=False)
+            #adv = craft_adversarial_example_pgd(model=target_model, x_natural=data, y=target, step_size=0.007, epsilon=8/255, perturb_steps=40, distance='l_inf')
 
             # Train MI estimator
             loss = MI_loss(i=batch_idx, model=target_model, x_natural=data, y=target, x_adv=adv, local_n=local_n,
@@ -551,7 +503,11 @@ def main():
             print('save the model')
 
         print('================================================================')
-
+    name = 'resnet-new-100-MIAT'
+    print(40*'=')
+    print(f"Saving model as {name}.")
+    utils.save_model(target_model, name)
+    print(40*'=')
 
 if __name__ == '__main__':
     main()
