@@ -247,6 +247,24 @@ def main():
 
     print(f"device: {device}") #sanity check - using GPU
 
+    # setup data loader - should we normalize again? I think so for consistency.
+    trans_train = transforms.Compose([
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize(*stats, inplace=False)
+    ])
+
+    trans_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(*stats, inplace=False)
+    ])
+
+    #set up data loaders for the original clean CIFAR images
+    trainset = data_dataset(img_path=args.nat_img_train, clean_label_path=args.nat_label_train, transform=trans_train)
+    train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, drop_last=False,shuffle=True, num_workers=4, pin_memory=True)
+    testset = data_dataset(img_path=args.nat_img_test, clean_label_path=args.nat_label_test, transform=trans_test)
+    test_loader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, drop_last=False, shuffle=False, num_workers=4, pin_memory=True)
     
     # load MI estimation model
 
@@ -295,26 +313,7 @@ def main():
     opt_local_a, schedule_local_a = make_optimizer_and_schedule(local_a, lr=args.lr_mi)
     opt_global_a, schedule_global_a = make_optimizer_and_schedule(global_a, lr=args.lr_mi)
 
-    #TODO move this back above all the model set up.
-    # setup data loader - should we normalize again? I think so for consistency.
-    trans_train = transforms.Compose([
-        transforms.RandomCrop(32, padding=4),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize(*stats, inplace=False)
-    ])
-
-    trans_test = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(*stats, inplace=False)
-    ])
-
-    #set up data loaders for the original clean CIFAR images
-    trainset = data_dataset(img_path=args.nat_img_train, clean_label_path=args.nat_label_train, transform=trans_train)
-    train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, drop_last=False,shuffle=True, num_workers=4, pin_memory=True)
-    testset = data_dataset(img_path=args.nat_img_test, clean_label_path=args.nat_label_test, transform=trans_test)
-    test_loader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, drop_last=False, shuffle=False, num_workers=4, pin_memory=True)
-
+   
     # Train
     for epoch in range(1, args.epochs + 1):
         loss_n_all = 0

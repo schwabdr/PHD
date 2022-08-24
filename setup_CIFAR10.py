@@ -69,5 +69,4 @@ with open(args.nat_label_test, 'wb') as f:
     np.save(f,Y_test)
 print("Save complete!")
 
-
 print(f"Hello again MIAT, EOF")
