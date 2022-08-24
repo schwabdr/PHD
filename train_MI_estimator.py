@@ -271,7 +271,7 @@ def main():
 
     print('----------------Start training-------------')
     target_model = ResNet18(10)
-    name = 'resnet-new-5' #input("Name of model to load: ") #for now I'll hard code so I don't have to retype the name while prototyping
+    name = 'resnet-new-100' #input("Name of model to load: ") #for now I'll hard code so I don't have to retype the name while prototyping
     #target_model = target_model.load_statetorch.load(os.path.join(args.SAVE_MODEL_PATH, name))
     #target_model = model = models.resnet18()
     target_model.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, name)))
@@ -295,7 +295,7 @@ def main():
     opt_local_a, schedule_local_a = make_optimizer_and_schedule(local_a, lr=args.lr_mi)
     opt_global_a, schedule_global_a = make_optimizer_and_schedule(global_a, lr=args.lr_mi)
 
-
+    #TODO move this back above all the model set up.
     # setup data loader - should we normalize again? I think so for consistency.
     trans_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
