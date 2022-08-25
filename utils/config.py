@@ -63,6 +63,12 @@ class Configuration:
         self.parser.add_argument('--warm-epochs', type=int, default=20, metavar='N', help='number of epochs to train')
         #parser.add_argument('--model-dir', default='./checkpoint/wideresnet/MIAT_standard', help='directory of model for saving checkpoint')
 
+        self.parser.add_argument('--pre-local-n', default='./checkpoint/resnet_18/MI_estimator/beta_final_l2/local_n_model.pth', help='directory of model for saving checkpoint')
+        self.parser.add_argument('--pre-global-n', default='./checkpoint/resnet_18/MI_estimator/beta_final_l2/global_n_model.pth', help='directory of model for saving checkpoint')
+        self.parser.add_argument('--pre-local-a', default='./checkpoint/resnet_18/MI_estimator/beta_final_l2/local_a_model.pth', help='directory of model for saving checkpoint')
+        self.parser.add_argument('--pre-global-a', default='./checkpoint/resnet_18/MI_estimator/beta_final_l2/global_a_model.pth',  help='directory of model for saving checkpoint')
+
+
 
         self.stats = ((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)) #mean and stdev
 

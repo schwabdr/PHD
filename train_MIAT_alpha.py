@@ -11,7 +11,6 @@ from torchvision import datasets, transforms
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
 
-from data import data_dataset
 from models.resnet_new import ResNet18
 #from models.wideresnet_new import WideResNet
 
@@ -23,7 +22,7 @@ import projected_gradient_descent as pgd
 
 from utils import config
 from utils import utils
-
+from utils.data import data_dataset
 
 stats = config.Configuration().getNormStats() 
 
@@ -420,11 +419,17 @@ def main():
     #target_model = WideResNet(34, 10, 10)
     target_model = torch.nn.DataParallel(target_model).cuda()
 
+    local_n.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'local_n')))
+    global_n.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'global_n')))
+    local_a.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'local_a')))
+    global_a.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'global_a')))
+
+    ''' #original lines to load - didn't work
     local_n.load_state_dict(torch.load(args.pre_local_n))
     global_n.load_state_dict(torch.load(args.pre_global_n))
     local_a.load_state_dict(torch.load(args.pre_local_a))
     global_a.load_state_dict(torch.load(args.pre_global_a))
-
+    '''
     local_n = torch.nn.DataParallel(local_n).cuda()
     global_n = torch.nn.DataParallel(global_n).cuda()
     local_a = torch.nn.DataParallel(local_a).cuda()
@@ -467,7 +472,7 @@ def main():
             data, target = data.to(device), target.to(device)
 
             # craft adversarial examples
-            adv = pgd.projected_gradient_descent(model, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf,y=None, targeted=False)
+            adv = pgd.projected_gradient_descent(target_model, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf,y=None, targeted=False)
             #adv = craft_adversarial_example_pgd(model=target_model, x_natural=data, y=target, step_size=0.007, epsilon=8/255, perturb_steps=40, distance='l_inf')
 
             # Train MI estimator
@@ -503,7 +508,7 @@ def main():
             print('save the model')
 
         print('================================================================')
-    name = 'resnet-new-100-MIAT'
+    name = 'resnet-new-100-MIAT-from-scratch'
     print(40*'=')
     print(f"Saving model as {name}.")
     utils.save_model(target_model, name)
