@@ -4,10 +4,17 @@ They can accept which layer's output they want to return ... and therefore they 
 as the encoder. This will help me understand the paper a bit better now. The encoder is one of the outer layers
 of the resnet model.
 
+https://discuss.pytorch.org/t/how-can-you-train-your-model-on-large-batches-when-your-gpu-can-t-hold-more-than-a-few-samples/80581
+https://discuss.pytorch.org/t/how-are-batches-split-across-multiple-gpus/91225
+
+
 ################## CURRENT WORK ##################
 1) TRAIN RESNET18 FOR CIFAR 10 - NO AT - DONE
-2) Make train_MI_estimator.py more efficient.
-3) See Adversarial Training in "Adversarial Machine Learning at Scale"
+2) Make train_MI_estimator.py more efficient. - DONE
+3) See Adversarial Training in "Adversarial Machine Learning at Scale" apply here
+
+************ remove the eval step from the training of the MIAT - don't need it really unless I'm going to plot, and it will speed up training *************
+************ optimize the PGD ***************
 
 ################## NORMALIZATION ##################
 https://github.com/ernoult/scalingDTP/pull/36
