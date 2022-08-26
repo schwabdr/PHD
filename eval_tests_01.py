@@ -29,7 +29,8 @@ classes = ['plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship'
 args = config.Configuration().getArgs()
 stats = config.Configuration().getNormStats()
 
-args.batch_size=512 #trying this
+#args.batch_size=512 #trying this
+args.batch_size=2048 #trying this
 
 '''
 There's plenty of CPU RAM (I think) so I'm going to stack the NumPy data on the CPU, and send it all here
@@ -137,10 +138,12 @@ def main():
     
     model.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, name)))
     model.to(device)
+    model = torch.nn.DataParallel(model).cuda() 
     model.eval()
 
     model2.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, name2)))
     model2.to(device)
+    model2 = torch.nn.DataParallel(model2).cuda() 
     model2.eval()
 
     print(f"Model loaded: {name}")
@@ -166,8 +169,11 @@ def main():
     t_adv.append(adv_accuracy)
     print("total acc:")
     print(test_accuracy)
+    print("total adv acc:")
+    print(adv_accuracy)
     print("total loss:")
     print(test_loss)
+    
     
     print(64*'=')
     test_loss, test_accuracy, adv_accuracy = eval_test_w_adv(model2, device, test_loader, model_adv=model2)
@@ -176,6 +182,8 @@ def main():
     t_adv.append(adv_accuracy)
     print("total acc:")
     print(test_accuracy)
+    print("total adv acc:")
+    print(adv_accuracy)
     print("total loss:")
     print(test_loss)
     
@@ -186,6 +194,8 @@ def main():
     t_adv.append(adv_accuracy)
     print("total acc:")
     print(test_accuracy)
+    print("total adv acc:")
+    print(adv_accuracy)
     print("total loss:")
     print(test_loss)
     

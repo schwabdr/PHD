@@ -14,7 +14,8 @@ https://discuss.pytorch.org/t/how-are-batches-split-across-multiple-gpus/91225
 3) See Adversarial Training in "Adversarial Machine Learning at Scale" apply here
 
 ************ remove the eval step from the training of the MIAT - don't need it really unless I'm going to plot, and it will speed up training *************
-************ optimize the PGD ***************
+************ optimize the PGD That is don't keep iterating if it's already fooling the target***************
+Put a cap on iterations in my "eval_tests_01.py"
 
 ################## NORMALIZATION ##################
 https://github.com/ernoult/scalingDTP/pull/36
