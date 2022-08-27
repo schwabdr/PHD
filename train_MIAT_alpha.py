@@ -41,6 +41,7 @@ nb_iter = args.nb_iter
 
 print(f"Using PGD with eps: {eps}, eps_iter: {eps_iter}, nb_iter: {nb_iter}")
 
+#I don't think this is even used ... should remove it
 class AverageMeter(object):
     """Computes and stores the average and current value"""
     def __init__(self):

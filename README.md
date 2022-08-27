@@ -29,6 +29,7 @@ Notes For running this project (primarily for myself right now).
 <li>Run make_adv_examples.py. This will create a dataset of adverarial examples from your ResNet18 model (depending on your GPUs can adjust batch size to get better utilization)</li>
 <li>Run train_MI_estimator.py. This will take a while.</li>
 <li>Finally, run train_MIAT_alpha.py. This will take a really long time. I'm going to work on speeding this up at some point </li>
+<li>To run adversarial attacks with varying L_infty norm constraints, run eval_tests_01.py
 </ol>
 
 System specs for my work. Special thanks to Tommy Gorham and his project for this data: https://github.com/tommygorham/unv-smi
