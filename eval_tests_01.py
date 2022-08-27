@@ -30,7 +30,7 @@ args = config.Configuration().getArgs()
 stats = config.Configuration().getNormStats()
 
 #args.batch_size=512 #trying this
-args.batch_size=2048 #trying this
+args.batch_size=2048 #trying this - this works with the data parallel - GPU util ~95%, memory 10800/11019 MB each GPU
 
 '''
 There's plenty of CPU RAM (I think) so I'm going to stack the NumPy data on the CPU, and send it all here
@@ -75,8 +75,8 @@ def eval_test_w_adv(model, device, test_loader, model_adv=None):
     nb_iter = 50
     '''
     
-    #this is our L_infty constraint
-    eps_lst = [.025, .05, .075, .1, .125, .15, .175, .2, .25, .3, .4, .5, .75, 1.]
+    #this is our L_infty constraint - added 1.5+ 
+    eps_lst = [.025, .05, .075, .1, .125, .15, .175, .2, .25, .3, .4, .5, .75, 1., 1.5, 2., 2.5]
     #eps_lst = [.025, .05] # for quick test
 
     for eps in eps_lst:
@@ -86,7 +86,8 @@ def eval_test_w_adv(model, device, test_loader, model_adv=None):
         correct_adv = 0
 
         eps_iter = .007
-        nb_iter = round(eps/eps_iter) + 10
+        #nb_iter = round(eps/eps_iter) + 10
+        nb_iter = 100 #trying this since I can do it in parallel now
         print(f"Using PGD with eps: {eps}, eps_iter: {eps_iter}, nb_iter: {nb_iter}")
         #with torch.no_grad():
         for data, target in test_loader:

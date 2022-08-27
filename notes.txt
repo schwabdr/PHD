@@ -7,6 +7,9 @@ of the resnet model.
 https://discuss.pytorch.org/t/how-can-you-train-your-model-on-large-batches-when-your-gpu-can-t-hold-more-than-a-few-samples/80581
 https://discuss.pytorch.org/t/how-are-batches-split-across-multiple-gpus/91225
 
+Tiny ImageNet
+https://www.kaggle.com/datasets/akash2sharma/tiny-imagenet
+
 
 ################## CURRENT WORK ##################
 1) TRAIN RESNET18 FOR CIFAR 10 - NO AT - DONE
@@ -21,6 +24,10 @@ Put a cap on iterations in my "eval_tests_01.py"
 https://github.com/ernoult/scalingDTP/pull/36
 And also see:
 https://github.com/kuangliu/pytorch-cifar/issues/19
+Standarization (this is what I really did)
+https://machinelearningmastery.com/how-to-normalize-center-and-standardize-images-with-the-imagedatagenerator-in-keras/
+
+
 
 ################## CONDA ENVIRONMENT ##################
 conda env phd04 - here's what I've done - pytorch 1.12 - I hope this keeps working.

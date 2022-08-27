@@ -1,4 +1,8 @@
-
+'''
+This is the code to train a network using the MIAT method.
+-replaced default adv ex crafting with Cleverhans PGD implementation 
+    original parms: step_size=0.007, epsilon=8/255, perturb_steps=40, distance='l_inf'
+'''
 import os
 import argparse
 import numpy as np
@@ -12,13 +16,13 @@ import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
 
 from models.resnet_new import ResNet18
-#from models.wideresnet_new import WideResNet
+#from models.wideresnet_new import WideResNet #might use eventually
 
 from models.estimator import Estimator
 from models.discriminators import MI1x1ConvNet, MIInternalConvNet, MIInternallastConvNet
 from compute_MI import compute_loss
 
-import projected_gradient_descent as pgd
+import projected_gradient_descent as pgd #cleverhans PGD
 
 from utils import config
 from utils import utils
@@ -78,58 +82,6 @@ def adjust_learning_rate(optimizer, epoch):
 
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
-
-
-def craft_adversarial_example_pgd(model, x_natural, y, step_size=0.007, epsilon=0.031, perturb_steps=20,
-                                  distance='l_inf'):
-    model.eval()
-
-    x_adv = x_natural.detach() + 0.001 * torch.randn(x_natural.shape).cuda().detach()
-
-    if distance == 'l_inf':
-        for _ in range(perturb_steps):
-            x_adv.requires_grad_()
-            with torch.enable_grad():
-                logits = model(x_adv)
-                loss_ce = F.cross_entropy(logits, y)
-
-            grad = torch.autograd.grad(loss_ce, [x_adv])[0]
-            x_adv = x_adv.detach() + step_size * torch.sign(grad.detach())
-            x_adv = torch.min(torch.max(x_adv, x_natural - epsilon), x_natural + epsilon)
-            x_adv = torch.clamp(x_adv, 0.0, 1.0)
-    elif distance == 'l_2':
-        batch_size = len(x_natural)
-        delta = 0.001 * torch.randn(x_natural.shape).cuda().detach()
-        delta = Variable(delta.data, requires_grad=True)
-
-        # Setup optimizers
-        optimizer_delta = optim.SGD([delta], lr=epsilon / perturb_steps * 2)
-
-        for _ in range(perturb_steps):
-            adv = x_natural + delta
-
-            # optimize
-            optimizer_delta.zero_grad()
-            with torch.enable_grad():
-                loss = (-1) * F.cross_entropy(model(adv), y)
-            loss.backward()
-            # renorming gradient
-            grad_norms = delta.grad.view(batch_size, -1).norm(p=2, dim=1)
-            delta.grad.div_(grad_norms.view(-1, 1, 1, 1))
-            # avoid nan or inf if gradient is 0
-            if (grad_norms == 0).any():
-                delta.grad[grad_norms == 0] = torch.randn_like(delta.grad[grad_norms == 0])
-            optimizer_delta.step()
-
-            # projection
-            delta.data.add_(x_natural)
-            delta.data.clamp_(0, 1).sub_(x_natural)
-            delta.data.renorm_(p=2, dim=0, maxnorm=epsilon)
-        x_adv = Variable(x_natural + delta, requires_grad=False)
-    else:
-        x_adv = torch.clamp(x_adv, 0.0, 1.0)
-
-    return x_adv
 
 
 def MI_loss_nat(i, model, x_natural, y, x_adv, local_n, global_n, epoch):
@@ -437,6 +389,7 @@ def main():
 
     cudnn.benchmark = True
 
+    #TODO try adam optimizer here
     optimizer = optim.SGD(target_model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
     # opt_local_n, schedule_local_n = make_optimizer_and_schedule(local_n, lr=args.lr_mi)

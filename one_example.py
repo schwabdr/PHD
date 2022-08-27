@@ -44,7 +44,9 @@ eps_iter = .007
 nb_iter = 100
 print(f"Using PGD with eps: {eps}, eps_iter: {eps_iter}, nb_iter: {nb_iter}")
 #281: tabby cat, 933: cheese burger
-img_adv = pgd.projected_gradient_descent(model, batch, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=torch.tensor([933]), targeted=True)
+#img_adv = pgd.projected_gradient_descent(model, batch, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=torch.tensor([933]), targeted=True)
+#untargeted attack:
+img_adv = pgd.projected_gradient_descent(model, batch, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=None, targeted=False)
 #print("img_adv: ",img_adv)
 
 prediction = model(img_adv).squeeze(0).softmax(0)
