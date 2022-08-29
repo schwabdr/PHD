@@ -455,10 +455,10 @@ def main():
         print('================================================================')
     # no need to save target - it is not changed by this process.
     print("Saving estimator models ...")
-    utils.save_model(local_n, 'local_n')
-    utils.save_model(global_n, 'global_n')
-    utils.save_model(local_a, 'local_a')
-    utils.save_model(global_a, 'global_a')
+    utils.save_model(local_n, 'local_n.1')
+    utils.save_model(global_n, 'global_n.1')
+    utils.save_model(local_a, 'local_a.1')
+    utils.save_model(global_a, 'global_a.1')
     print("Save Complete. Exiting ...")
 
 if __name__ == '__main__':

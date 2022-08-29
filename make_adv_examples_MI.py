@@ -1,8 +1,8 @@
 '''
-The point of this file is to create an adversarial example dataset that can be read from disk simliar to the training / test set
+The point of this file is to create an adversarial example dataset using MI loss that can be read from disk simliar to the training / test set
+This will be used once I fine tune the MI-Craft method for crafting adversarial examples.
 '''
 
-from configparser import Interpolation
 import torch
 from torchvision import transforms
 import torch.backends.cudnn as cudnn
@@ -10,7 +10,7 @@ import torch.backends.cudnn as cudnn
 import numpy as np
 import os
 
-from projected_gradient_descent import projected_gradient_descent as pgd
+from pgd_mi import projected_gradient_descent as pgd
 
 import random
 
@@ -18,6 +18,9 @@ from models.resnet_new import ResNet18
 
 from utils import config
 from utils import data 
+
+from models.estimator import Estimator
+from models.discriminators import MI1x1ConvNet, MIInternalConvNet, MIInternallastConvNet
 
 import matplotlib
 matplotlib.use('tkagg')
@@ -27,9 +30,9 @@ c = config.Configuration()
 args = c.getArgs()
 stats = c.getNormStats()
 
-args.batch_size = 2048 #can probably almost double this number - only using about 6811 MiB / 11019 MiB
-
 classes = ['plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+
+args.batch_size=1024 #may need to reduce. 
 
 def show_grid(x, y):
     rows = 5
@@ -101,18 +104,20 @@ def open_adv_examples():
 
 
 
-def make_examples(model, device, train_loader, test_loader):
-    #eps = 8/255. #original value 
-    eps = .1 #for the named ".1" dataset and estimators
+def make_examples(models, device, train_loader, test_loader):
+    #I'll pick these values once I see the data.
+    eps = 8/255.
     eps_iter = .007
-    nb_iter = 50
+    nb_iter = 40
     print(f"Using PGD with eps: {eps}, eps_iter: {eps_iter}, nb_iter: {nb_iter}")
 
     first = True
     for data, target in train_loader:
         data, target = data.to(device), target.to(device)
 
-        data_adv = pgd(model, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf,y=None, targeted=False)
+        #data_adv = pgd.projected_gradient_descent(model, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf,y=None, targeted=False)
+        data_adv = pgd(models, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=None, targeted=False)
+            
         if first:
             x_adv = data_adv.detach().cpu().numpy().transpose(0,2,3,1)
             y_true = target.detach().cpu().numpy()
@@ -140,7 +145,9 @@ def make_examples(model, device, train_loader, test_loader):
     for data, target in test_loader:
         data, target = data.to(device), target.to(device)
         #c = c + 1
-        data_adv = pgd(model, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf,y=None, targeted=False)
+        #data_adv = pgd.projected_gradient_descent(model, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf,y=None, targeted=False)
+        data_adv = pgd(models, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=None, targeted=False)
+            
         if first:
             x_test_adv = data_adv.detach().cpu().numpy().transpose(0,2,3,1)
             y_test_true = target.detach().cpu().numpy()
@@ -165,8 +172,8 @@ def make_examples(model, device, train_loader, test_loader):
     
 
 
-    #show_grid(x_adv, y_true) #display a random 5x5 grid of the imgs for sanity check
-    #show_grid(x_test_adv, y_test_true) #display a random 5x5 grid of the imgs for sanity check
+    show_grid(x_adv, y_true) #display a random 5x5 grid of the imgs for sanity check
+    show_grid(x_test_adv, y_test_true) #display a random 5x5 grid of the imgs for sanity check
 
 
 
@@ -186,20 +193,12 @@ def make_examples(model, device, train_loader, test_loader):
     
 
 def main():
-    print(f"hello MIAT - we are creating adversarial example data on disk as np arrays")
+    print(f"hello MIAT - we are creating adversarial (using MI as loss) example data on disk as np arrays")
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
+
+    print(f"device: {device}") #sanity check - using GPU
     
-    name = 'resnet-new-100' #input("Name of model to load: ") #for now I'll hard code the only model I have trained
-    model = ResNet18(10)
-    path = str(os.path.join(args.SAVE_MODEL_PATH, name))
-
-    model.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, name)))
-    model.to(device)
-    model = torch.nn.DataParallel(model) #nvidia-smi shows multi GPU usage for crafting ADV examples
-    model.eval()
-    print(f"Model loaded: {name}. Will generate adversarial examples from this model.")
-
     # setup data loader
     # don't flip the images here!!!
     trans_train = transforms.Compose([
@@ -228,10 +227,59 @@ def main():
     test_loader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, drop_last=False, shuffle=False,
                                               num_workers=4, pin_memory=True)
 
-    cudnn.benchmark() # added to see if it speeds up.
-    make_examples(model, device, train_loader, test_loader)
+   
+    # need to read up on this next section ...
+    # Estimator part 1: X or layer3 to H space
+    local_n = Estimator(args.va_hsize)
+    local_a = Estimator(args.va_hsize)
+
+    # estimator part 2: Z to H space
+    if args.is_internal == True:
+        if args.is_internal_last == True:
+            z_size = 512
+            global_n = MIInternallastConvNet(z_size, args.va_hsize)
+            global_a = MIInternallastConvNet(z_size, args.va_hsize)
+        else:
+            z_size = 256
+            global_n = MIInternalConvNet(z_size, args.va_hsize)
+            global_a = MIInternalConvNet(z_size, args.va_hsize)
+    else: #it's this case based on 'args' in config.py
+        z_size = 10
+        global_n = MI1x1ConvNet(z_size, args.va_hsize)
+        global_a = MI1x1ConvNet(z_size, args.va_hsize)
+
+    local_n.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'local_n')))
+    global_n.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'global_n')))
+    local_a.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'local_a')))
+    global_a.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'global_a')))
+
+    
+    local_n = torch.nn.DataParallel(local_n).cuda()
+    global_n = torch.nn.DataParallel(global_n).cuda()
+    local_a = torch.nn.DataParallel(local_a).cuda()
+    global_a = torch.nn.DataParallel(global_a).cuda()
+
+    #load models
+    name = 'resnet-new-100-MIAT-from-scratch'
+    model = ResNet18(10)
+    path = str(os.path.join(args.SAVE_MODEL_PATH, name))
+    
+    model.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, name)))
+    model.to(device)
+    model = torch.nn.DataParallel(model).cuda() 
+    model.eval()
+
+    cudnn.benchmark = True #trying this
+
+    print(f"Model loaded: {name}. Will craft examples from here.")
+    
+
+    #           0      1       2        3        4         5
+    models = [model, model, local_n, local_a, global_n, global_a]
+
+    make_examples(models, device, train_loader, test_loader)
 
         
 if __name__ == '__main__':
     main()
-    #open_adv_examples() #verify images can be read back from disk
+    open_adv_examples() #verify images can be read back from disk

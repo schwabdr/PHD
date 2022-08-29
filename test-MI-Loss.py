@@ -1,6 +1,12 @@
 '''
+Uses MI-Craft 
+
 Purpose of this file is to begin work on task 2 of my planned contribution
 2. Use the Mutual Information (MI) estimation networks as a metric to aid in the crafting of adversarial examples.
+Newer version of this file (-02)
+Perform experiment where we vary alpha. See equation 8 of 
+https://arxiv.org/abs/2207.12203
+
 '''
 from locale import locale_encoding_alias
 import os
@@ -10,7 +16,6 @@ import torch.optim as optim
 from torchvision import transforms
 import torchvision.models as models
 import torch.backends.cudnn as cudnn
-from torch.optim import lr_scheduler, Adam
 
 import numpy as np
 
@@ -38,7 +43,7 @@ stats = config.Configuration().getNormStats()
 #according to above link - we could adjust as we see fit -- I could get a little better performance 
 #if I increase batch size a bit. 
 # this batch size sits at 8593 MiB / 11019 MiB on GPU 0 
-args.batch_size=512 #may need to reduce. 2048 was too high 1024 too high
+args.batch_size=672 #may need to reduce. 2048 was too high 1024 too high
 
 #PGD Parameters
 eps = args.eps
@@ -78,8 +83,11 @@ def craft_and_eval(models, device, test_loader):
     #this is our L_infty constraint - added 1.5+ 
     eps_lst = [.025, .05, .075, .1, .125, .15, .175, .2, .25, .3, .4, .5, .75, 1.] #, 1.5, 2., 2.5] #stopping at 1
     #eps_lst = [.025, .05] # for quick test
+    #alpha_lst = [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,12.,13.,14.,15.]
 
     for eps in eps_lst:
+        alpha = 5.
+        #eps = .025
         print(25*'=')
         test_loss = 0
         correct = 0
@@ -88,7 +96,7 @@ def craft_and_eval(models, device, test_loader):
         eps_iter = .007
         nb_iter = round(eps/eps_iter) + 10
         #nb_iter = 100 #trying this since I can do it in parallel now
-        print(f"Using PGD with eps: {eps}, eps_iter: {eps_iter}, nb_iter: {nb_iter}")
+        print(f"Using PGD with eps: {eps}, eps_iter: {eps_iter}, nb_iter: {nb_iter}, alpha: {alpha}")
         #with torch.no_grad():
         i = 0
         for data, target in test_loader:
@@ -96,7 +104,7 @@ def craft_and_eval(models, device, test_loader):
             print(f"batch number {i}, {i*args.batch_size} / {len(test_loader.dataset)}")
             data, target = data.to(device), target.to(device)
             #pass all the models to the pgd function
-            data_adv = pgd(models, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=None, targeted=False)
+            data_adv = pgd(models, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=None, targeted=False, alpha=alpha)
             
             #x_adv = data_adv.detach().cpu().numpy().transpose(0,2,3,1) #I'll use this later - gonna paste all the images together.
             output = model(data)
@@ -162,10 +170,17 @@ def main():
         global_n = MI1x1ConvNet(z_size, args.va_hsize)
         global_a = MI1x1ConvNet(z_size, args.va_hsize)
 
-    local_n.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'local_n')))
-    global_n.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'global_n')))
-    local_a.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'local_a')))
-    global_a.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'global_a')))
+    l_n = 'local_n.1'
+    g_n = 'global_n.1'
+    l_a = 'local_a.1'
+    g_a = 'global_a.1'
+
+    local_n.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, l_n)))
+    global_n.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, g_n)))
+    local_a.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, l_a)))
+    global_a.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, g_a)))
+
+    print(f"Estimator Models Loaded: {l_n} {g_n} {l_a} {g_a}")
 
     
     local_n = torch.nn.DataParallel(local_n).cuda()
@@ -190,7 +205,7 @@ def main():
     model2 = torch.nn.DataParallel(model2).cuda() 
     model2.eval()
     
-    cudnn.benchmark = False
+    cudnn.benchmark = True #is this why it's so slow? surely not ... It was false - just changed it.
 
     print(f"Model loaded: {name}")
     print(f"Model loaded: {name2}")
@@ -201,6 +216,7 @@ def main():
     t_adv = []
     t_loss = []
     
+    '''
 
     print(64*'=')
     #           0      1       2        3        4         5
@@ -217,12 +233,12 @@ def main():
     print(adv_accuracy)
     print("total loss:")
     print(test_loss)
-
+    '''
     print(64*'=')
     #           0      1       2        3        4         5
     models = [model2, model2, local_n, local_a, global_n, global_a]
 
-    print("Test Target: STD, Oracle: STD")
+    print("Test Target: MIAT, Oracle: MIAT")
     test_loss, test_accuracy, adv_accuracy = craft_and_eval(models, device, test_loader)
     t_acc.append(test_accuracy)
     t_loss.append(test_loss)

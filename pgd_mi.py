@@ -33,8 +33,9 @@ This should be wrapped up in a utils file or something ... but for now I'll just
 
 '''
 Name of this function is perhaps misleading as it gives TOTAL loss, not just the MI loss.
+:param alpha: (optional) float. Hyper parameter for tuning the MI portion of loss.
 '''
-def MI_loss(model, x_natural, y, x_adv, local_n, global_n, local_a, global_a):
+def MI_loss(model, x_natural, y, x_adv, local_n, global_n, local_a, global_a, alpha=5.0):
     model.eval() #changed to eval not train()
     local_n.eval()
     global_n.eval()
@@ -54,14 +55,14 @@ def MI_loss(model, x_natural, y, x_adv, local_n, global_n, local_a, global_a):
 
     if torch.nonzero(index).size(0) != 0:
 
-
+        #see equation 8, 9 - it looks like in the actual code implmentation they leave off the lambda term E_a(h(x)) - E_n(h(x))
         loss_n = compute_loss(args=args, former_input=x_natural, latter_input=x_natural, encoder=model,
                 dim_local=local_n, dim_global=global_n, v_out=True) * index
 
         loss_a = compute_loss(args=args, former_input=x_natural, latter_input=x_adv, encoder=model,
                                dim_local=local_n, dim_global=global_n, v_out=True) * index
 
-        # loss_a_all = loss_a
+        loss_a_all = loss_a # added this back in it was commented out
         loss_mea_n = torch.abs(torch.tensor(1.0).cuda() - torch.cosine_similarity(loss_n, loss_a, dim=0))
 
 
@@ -71,16 +72,18 @@ def MI_loss(model, x_natural, y, x_adv, local_n, global_n, local_a, global_a):
         loss_n = compute_loss(args=args, former_input=x_adv - x_natural, latter_input=x_natural, encoder=model,
                               dim_local=local_a, dim_global=global_a, v_out=True) * index
 
-        # loss_a_all = torch.tensor(0.1).cuda() * (loss_a_all - loss_a)
+        #loss_a_all = torch.tensor(0.1).cuda() * (loss_a_all - loss_a) #added back in - it was commented out
+        loss_a_all = (loss_a_all - loss_a) #added back in - it was commented out
         loss_mea_a = torch.abs(torch.tensor(1.0).cuda() - torch.cosine_similarity(loss_n, loss_a, dim=0))
-
 
         loss_mi = loss_mea_n + loss_mea_a # + loss_a_all
 
+        print(f"loss_ce: {loss_ce}, loss_mi: {loss_mi}, 5*loss_mi {5*loss_mi}, loss_a_all: {loss_a_all}")
+
     else:
         loss_mi = 0.0
-    # i'd like to tune this parameter of 5.0 possibly
-    loss_all = loss_ce + 5.0 * loss_mi
+    # default is alpha = 5
+    loss_all = loss_ce + alpha * loss_mi
 
     return loss_all
 
@@ -102,11 +105,13 @@ def fast_gradient_method(
     y=None,
     targeted=False,
     sanity_checks=False,
+    alpha=5,
 ):
     """
     PyTorch implementation of the Fast Gradient Method.
     :param model_fns: a list of callables that takes an input tensor and returns the model logits.
     :param x: input tensor.
+    :param x_clean: the clean sample - non-adv
     :param eps: epsilon (input variation parameter); see https://arxiv.org/abs/1412.6572.
     :param norm: Order of the norm (mimics NumPy). Possible values: np.inf, 1 or 2.
     :param clip_min: (optional) float. Minimum float value for adversarial example components.
@@ -121,6 +126,7 @@ def fast_gradient_method(
               Targeted will instead try to move in the direction of being more like y.
     :param sanity_checks: bool, if True, include asserts (Turn them off to use less runtime /
               memory or for unit tests that intentionally pass strange input)
+    :param alpha: (optional) float. Hyper parameter for tuning the MI portion of loss.
     :return: a tensor for the adversarial example
     """
     if norm not in [np.inf, 1, 2]:
@@ -169,7 +175,7 @@ def fast_gradient_method(
     # Compute loss
     #loss_fn = torch.nn.CrossEntropyLoss()
     #loss = loss_fn(model_fn(x), y)
-    loss = MI_loss(model_fns[1], x_clean, y, x, model_fns[2], model_fns[4], model_fns[3], model_fns[5])
+    loss = MI_loss(model_fns[1], x_clean, y, x, model_fns[2], model_fns[4], model_fns[3], model_fns[5],alpha=alpha)
     #def: loss = MI_loss(model, x_natural, y, x_adv, local_n, global_n, local_a, global_a)
     # If attack is targeted, minimize loss of target label rather than maximize loss of correct label
     if targeted:
@@ -214,6 +220,7 @@ def projected_gradient_descent(
     rand_init=True,
     rand_minmax=None,
     sanity_checks=True,
+    alpha=5,
 ):
     """
     This class implements either the Basic Iterative Method
@@ -243,6 +250,7 @@ def projected_gradient_descent(
               True. Default equals to eps.
     :param sanity_checks: bool, if True, include asserts (Turn them off to use less runtime /
               memory or for unit tests that intentionally pass strange input)
+    :param alpha: (optional) float. Hyper parameter for tuning the MI portion of loss.
     :return: a tensor for the adversarial example
     """
     #model_fns[0] is the target model
@@ -328,6 +336,7 @@ def projected_gradient_descent(
             clip_max=clip_max,
             y=y,
             targeted=targeted,
+            alpha=alpha,
         )
 
         # Clipping perturbation eta to norm norm ball #schwab: eta is the perturbation. Need to clip to Norm ball.

@@ -209,7 +209,6 @@ def main():
     print(test_accuracy)
     print("total ADV acc:")
     print(adv_accuracy)
-    
     print("total loss:")
     print(test_loss)
     

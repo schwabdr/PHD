@@ -11,6 +11,11 @@ Tiny ImageNet
 https://www.kaggle.com/datasets/akash2sharma/tiny-imagenet
 
 
+These values were used for the adversarial dataset for initial MIAT training.
+eps = 8/255.
+eps_iter = .007
+nb_iter = 40
+
 ################## CURRENT WORK ##################
 1) TRAIN RESNET18 FOR CIFAR 10 - NO AT - DONE
 2) Make train_MI_estimator.py more efficient. - DONE
