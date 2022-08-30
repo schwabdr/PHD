@@ -103,7 +103,8 @@ def open_adv_examples():
 
 def make_examples(model, device, train_loader, test_loader):
     #eps = 8/255. #original value 
-    eps = .1 #for the named ".1" dataset and estimators
+    #eps = .1 #for the named ".1" dataset and estimators
+    eps = .5 # will name it .5 dataset and estimators
     eps_iter = .007
     nb_iter = 50
     print(f"Using PGD with eps: {eps}, eps_iter: {eps_iter}, nb_iter: {nb_iter}")
@@ -228,7 +229,7 @@ def main():
     test_loader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, drop_last=False, shuffle=False,
                                               num_workers=4, pin_memory=True)
 
-    cudnn.benchmark() # added to see if it speeds up.
+    cudnn.benchmark = True # added to see if it speeds up.
     make_examples(model, device, train_loader, test_loader)
 
         

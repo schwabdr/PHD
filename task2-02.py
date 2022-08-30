@@ -41,8 +41,8 @@ stats = config.Configuration().getNormStats()
 #according to above link - we could adjust as we see fit -- I could get a little better performance 
 #if I increase batch size a bit. 
 # this batch size sits at 8593 MiB / 11019 MiB on GPU 0 
-args.batch_size=256 #672 was overloading GPU memory #may need to reduce. 2048 was too high 1024 too high
-
+args.batch_size=512 #672 was overloading GPU memory #may need to reduce. 2048 was too high 1024 too high
+#args.batch_size=32
 #PGD Parameters
 eps = args.eps
 eps_iter = args.eps_iter
@@ -51,13 +51,13 @@ nb_iter = args.nb_iter
 def craft_and_eval(models, device, test_loader):
     if len(models) == 1:
         model = models[0]
-        model_adv = models[0]
+        model2 = models[0]
     elif len(models) == 2:
         model = models[0]
-        model_adv = models[1]
+        model2 = models[1]
     elif len(models)==6:
         model = models[0]
-        model_adv = models[1]
+        model2 = models[1]
         local_n = models[2]
         local_a = models[3]
         global_n = models[4]
@@ -80,7 +80,7 @@ def craft_and_eval(models, device, test_loader):
     
     #this is our L_infty constraint - added 1.5+ 
     #eps_lst = [.025, .05, .075, .1, .125, .15, .175, .2, .25, .3, .4, .5, .75, 1.] #, 1.5, 2., 2.5] #stopping at 1
-    eps_lst = [.03]
+    eps_lst = [.15]
     #eps_lst = [.025, .05] # for quick test
     #alpha_lst = [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,12.,13.,14.,15.]
 
@@ -92,8 +92,11 @@ def craft_and_eval(models, device, test_loader):
         correct = 0
         correct_adv = 0
 
-        eps_iter = .007
-        nb_iter = round(eps/eps_iter) + 10
+        #eps_iter = .007
+        eps_iter = .005
+        #nb_iter = round(eps/eps_iter) + 10
+        nb_iter = 50
+        #nb_iter = 50
         #nb_iter = 100 #trying this since I can do it in parallel now
         print(f"Using PGD with eps: {eps}, eps_iter: {eps_iter}, nb_iter: {nb_iter}, alpha: {alpha}")
         #with torch.no_grad():
@@ -102,19 +105,38 @@ def craft_and_eval(models, device, test_loader):
             i = i+1
             print(f"batch number {i}, {i*args.batch_size} / {len(test_loader.dataset)}")
             data, target = data.to(device), target.to(device)
+            #print(target)
+            #new_target = model2(data)
+            #new_target = F.softmax(new_target, dim=0)
+            #out, inds = torch.max(new_target, dim=0)
+            #new_target[inds] = 0.
+            #print(new_target)
+            
+            #https://discuss.pytorch.org/t/how-to-remove-an-element-from-a-1-d-tensor-by-index/23109/14
+            #mask = torch.ones(new_target.numel(), dtype=torch.bool)
+            #mask[inds] = False
+            #new_target = new_target[mask]
+
+            #break
+            #new_target = new_target.min(1, keepdim=False)[1] #should be the new least likely class
+            #print(new_target)
             #pass all the models to the pgd function
-            data_adv = pgd(models, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=None, targeted=False, alpha=alpha)
+            data_adv = pgd(models, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=None, y_true=None,targeted=False, alpha=alpha)
+            #data_adv = pgd(models, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=new_target, y_true=target, targeted=True, alpha=alpha)
             
             #x_adv = data_adv.detach().cpu().numpy().transpose(0,2,3,1) #I'll use this later - gonna paste all the images together.
-            output = model(data)
-            output_adv = model(data_adv)
+            output = model2(data)
+            output_adv = model2(data_adv)
             test_loss += F.cross_entropy(output, target, reduction='sum').item()
             pred = output.max(1, keepdim=True)[1]
             pred_adv = output_adv.max(1, keepdim=True)[1]
             correct += pred.eq(target.view_as(pred)).sum().item()
             correct_adv += pred_adv.eq(target.view_as(pred_adv)).sum().item()
             
+            #if i==3:
+            #    break
             #break # do one batch for quick test
+        print("Robust Accuracy: {:.5f}%".format(correct_adv / (i*args.batch_size)))
         test_loss /= len(test_loader.dataset)
         print('Test: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%), Robust Accuracy: {}/{} ({:.0f}%)'.format(
             test_loss, correct, len(test_loader.dataset),
@@ -169,10 +191,10 @@ def main():
         global_n = MI1x1ConvNet(z_size, args.va_hsize)
         global_a = MI1x1ConvNet(z_size, args.va_hsize)
 
-    l_n = 'local_n.1'
-    g_n = 'global_n.1'
-    l_a = 'local_a.1'
-    g_a = 'global_a.1'
+    l_n = 'local_n.5'
+    g_n = 'global_n.5'
+    l_a = 'local_a.5'
+    g_a = 'global_a.5'
 
     local_n.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, l_n)))
     global_n.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, g_n)))
@@ -188,9 +210,9 @@ def main():
     global_a = torch.nn.DataParallel(global_a).cuda()
     '''
     #load both models 
-    #name = 'resnet-new-100' 
+    name = 'resnet-new-100' 
     name2 = 'resnet-new-100-MIAT-from-scratch'
-    #model = ResNet18(10)
+    model = ResNet18(10)
     model2 = ResNet18(10)
     
     #model.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, name)))
@@ -198,32 +220,31 @@ def main():
     #model = torch.nn.DataParallel(model).cuda() 
     #model.eval()
 
+    model.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, name)))
     model2.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, name2)))
-    #model2.to(device)
-    #model2 = torch.nn.DataParallel(model2).cuda() 
-    #model2.eval()
     
-    #cudnn.benchmark = True #is this why it's so slow? surely not ... It was false - just changed it.
-
-    #print(f"Model loaded: {name}")
+    print(f"Model loaded: {name}")
     print(f"Model loaded: {name2}")
     
     local_n = torch.nn.DataParallel(local_n).cuda()
     global_n = torch.nn.DataParallel(global_n).cuda()
     local_a = torch.nn.DataParallel(local_a).cuda()
     global_a = torch.nn.DataParallel(global_a).cuda()
+    model = torch.nn.DataParallel(model2).cuda()
     model2 = torch.nn.DataParallel(model2).cuda()
 
     local_n.to(device)
     global_n.to(device)
     local_a.to(device)
     global_a.to(device)
+    model.to(device)
     model2.to(device)
 
     local_n.eval()
     global_n.eval()
     local_a.eval()
     global_a.eval()
+    model.eval()
     model2.eval()
 
     cudnn.benchmark = True #is this why it's so slow? surely not ... It was false - just changed it.
@@ -251,7 +272,7 @@ def main():
     '''
     print(64*'=')
     #           0      1       2        3        4         5
-    models = [model2, model2, local_n, local_a, global_n, global_a]
+    models = [model, model2, local_n, local_a, global_n, global_a]
 
     print("Test Target: MIAT, Oracle: MIAT")
     test_loss, test_accuracy, adv_accuracy = craft_and_eval(models, device, test_loader)

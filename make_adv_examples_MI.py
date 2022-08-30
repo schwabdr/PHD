@@ -1,4 +1,5 @@
 '''
+NOT COMPLETE
 The point of this file is to create an adversarial example dataset using MI loss that can be read from disk simliar to the training / test set
 This will be used once I fine tune the MI-Craft method for crafting adversarial examples.
 '''

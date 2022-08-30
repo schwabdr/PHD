@@ -35,56 +35,74 @@ This should be wrapped up in a utils file or something ... but for now I'll just
 Name of this function is perhaps misleading as it gives TOTAL loss, not just the MI loss.
 :param alpha: (optional) float. Hyper parameter for tuning the MI portion of loss.
 '''
-def MI_loss(model, x_natural, y, x_adv, local_n, global_n, local_a, global_a, alpha=5.0):
-    model.eval() #changed to eval not train()
+def MI_loss(models, x_natural, y, y_true ,x_adv, local_n, global_n, local_a, global_a, alpha=5.0, lambd=0.1):
+    model = models[0] #changed to eval not train()
+    model.eval()
+    model2 = models[1]
     local_n.eval()
     global_n.eval()
     local_a.eval()
     global_a.eval()
 
+    if y_true is None:
+        y_true = y
+        
     # logits_nat = model(x_natural)
     logits_adv = model(x_adv)
 
     loss_ce = F.cross_entropy(logits_adv, y)
     # loss_ce = 0.2 * F.cross_entropy(logits_nat, y) + 0.8 * F.cross_entropy(logits_adv, y)
 
-    pesudo_label = F.softmax(model(x_natural), dim=0).max(1, keepdim=True)[1].squeeze()
-    index = (pesudo_label == y)
-    pesudo_label = F.softmax(model(x_adv), dim=0).max(1, keepdim=True)[1].squeeze()
-    index = index * (pesudo_label != y)
+    # I believe this little block of code is looking for the indices of the samples that are misclassified
+    pseudo_label = F.softmax(model(x_natural), dim=0).max(1, keepdim=True)[1].squeeze()
+    #print(f"pseudo_label: {pseudo_label}")
+    index = (pseudo_label == y_true)
+    pseudo_label = F.softmax(model(x_adv), dim=0).max(1, keepdim=True)[1].squeeze()
+    index = index * (pseudo_label != y_true)
 
     if torch.nonzero(index).size(0) != 0:
-
+    #if True:
         #see equation 8, 9 - it looks like in the actual code implmentation they leave off the lambda term E_a(h(x)) - E_n(h(x))
-        loss_n = compute_loss(args=args, former_input=x_natural, latter_input=x_natural, encoder=model,
-                dim_local=local_n, dim_global=global_n, v_out=True) * index
+        loss_n = compute_loss(args=args, former_input=x_natural, latter_input=x_natural, encoder=model2,
+                dim_local=local_n, dim_global=global_n, v_out=True)* index
 
-        loss_a = compute_loss(args=args, former_input=x_natural, latter_input=x_adv, encoder=model,
+        loss_a = compute_loss(args=args, former_input=x_natural, latter_input=x_adv, encoder=model2,
                                dim_local=local_n, dim_global=global_n, v_out=True) * index
 
         loss_a_all = loss_a # added this back in it was commented out
         loss_mea_n = torch.abs(torch.tensor(1.0).cuda() - torch.cosine_similarity(loss_n, loss_a, dim=0))
 
 
-        loss_a = compute_loss(args=args, former_input=x_adv - x_natural, latter_input=x_adv, encoder=model,
+        loss_a = compute_loss(args=args, former_input=x_adv - x_natural, latter_input=x_adv, encoder=model2,
                               dim_local=local_a, dim_global=global_a, v_out=True) * index
 
-        loss_n = compute_loss(args=args, former_input=x_adv - x_natural, latter_input=x_natural, encoder=model,
+        loss_n = compute_loss(args=args, former_input=x_adv - x_natural, latter_input=x_natural, encoder=model2,
                               dim_local=local_a, dim_global=global_a, v_out=True) * index
 
         #loss_a_all = torch.tensor(0.1).cuda() * (loss_a_all - loss_a) #added back in - it was commented out
-        loss_a_all = (loss_a_all - loss_a) #added back in - it was commented out
+        lambd = .1
+        alpha = 5
+        loss_a_all = torch.tensor(lambd).cuda() * torch.max((loss_a_all - loss_a)) #added back in - it was commented out
+        #loss_a_all = torch.tensor(lambd).cuda() * torch.mean((loss_a_all - loss_a)) #
         loss_mea_a = torch.abs(torch.tensor(1.0).cuda() - torch.cosine_similarity(loss_n, loss_a, dim=0))
 
-        loss_mi = loss_mea_n + loss_mea_a # + loss_a_all
-
-        print(f"loss_ce: {loss_ce}, loss_mi: {loss_mi}, 5*loss_mi {5*loss_mi}, loss_a_all: {loss_a_all}")
-
+        #loss_mi = loss_mea_n + loss_mea_a # + loss_a_all # original line
+        loss_mi = loss_mea_n + loss_mea_a + loss_a_all
+        #loss_mi = loss_a_all
+        #loss_all = alpha * (loss_mi + loss_a_all)
+        
+        #loss_all = loss_ce + alpha * loss_mi
+        beta = .5
+        loss_all = beta * loss_ce + (1-beta) * (alpha * loss_mi)
+        print(f"loss_ce: {loss_ce}, loss_mea_n: {loss_mea_n}, loss_mea_a: {loss_mea_a}, loss_a_all: {loss_a_all}, loss_all: {loss_all}")
     else:
+        print("we're in the else where loss_mi is set to 0!")
         loss_mi = 0.0
+        loss_all = loss_ce
+        print(f"loss_all=loss_ce={loss_all}")
     # default is alpha = 5
-    loss_all = loss_ce + alpha * loss_mi
-
+    #loss_all = loss_ce + alpha * loss_mi # original line
+    #loss_all = alpha * loss_mi
     return loss_all
 
 
@@ -103,6 +121,7 @@ def fast_gradient_method(
     clip_min=None,
     clip_max=None,
     y=None,
+    y_true=None,
     targeted=False,
     sanity_checks=False,
     alpha=5,
@@ -175,7 +194,8 @@ def fast_gradient_method(
     # Compute loss
     #loss_fn = torch.nn.CrossEntropyLoss()
     #loss = loss_fn(model_fn(x), y)
-    loss = MI_loss(model_fns[1], x_clean, y, x, model_fns[2], model_fns[4], model_fns[3], model_fns[5],alpha=alpha)
+    #print(f"loss_ce: {loss}")
+    loss = MI_loss(model_fns, x_clean, y, y_true, x, model_fns[2], model_fns[4], model_fns[3], model_fns[5],alpha=alpha)
     #def: loss = MI_loss(model, x_natural, y, x_adv, local_n, global_n, local_a, global_a)
     # If attack is targeted, minimize loss of target label rather than maximize loss of correct label
     if targeted:
@@ -216,6 +236,7 @@ def projected_gradient_descent(
     clip_min=None,
     clip_max=None,
     y=None,
+    y_true=None,
     targeted=False,
     rand_init=True,
     rand_minmax=None,
@@ -335,6 +356,7 @@ def projected_gradient_descent(
             clip_min=clip_min,
             clip_max=clip_max,
             y=y,
+            y_true=y_true,
             targeted=targeted,
             alpha=alpha,
         )
