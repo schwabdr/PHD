@@ -43,7 +43,7 @@ stats = config.Configuration().getNormStats()
 # this batch size sits at 8593 MiB / 11019 MiB on GPU 0 
 #args.batch_size=512 #672 was overloading GPU memory #may need to reduce. 2048 was too high 1024 too high
 
-args.batch_size=4
+args.batch_size=512
 #PGD Parameters
 eps = args.eps
 eps_iter = args.eps_iter
@@ -97,7 +97,7 @@ def craft_and_eval(models, device, test_loader):
         #eps_iter = .005
         #nb_iter = round(eps/eps_iter) + 10
         #nb_iter = 50
-        nb_iter = 100 
+        nb_iter = 50 
         print(f"Using PGD with eps: {eps}, eps_iter: {eps_iter}, nb_iter: {nb_iter}, alpha: {alpha}")
         #with torch.no_grad():
         i = 0
@@ -121,19 +121,19 @@ def craft_and_eval(models, device, test_loader):
             #new_target = new_target.min(1, keepdim=False)[1] #should be the new least likely class
             #print(new_target)
             #pass all the models to the pgd function
-            data_adv = pgd(models, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=None, y_true=None,targeted=False, alpha=alpha)
+            data_adv = pgd(models, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=None, y_true=None,targeted=False)
             #data_adv = pgd(models, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=new_target, y_true=target, targeted=True, alpha=alpha)
             
             #x_adv = data_adv.detach().cpu().numpy().transpose(0,2,3,1) #I'll use this later - gonna paste all the images together.
-            output = model2(data)
-            output_adv = model2(data_adv)
+            output = model(data)
+            output_adv = model(data_adv)
             test_loss += F.cross_entropy(output, target, reduction='sum').item()
             pred = output.max(1, keepdim=True)[1]
             pred_adv = output_adv.max(1, keepdim=True)[1]
             correct += pred.eq(target.view_as(pred)).sum().item()
             correct_adv += pred_adv.eq(target.view_as(pred_adv)).sum().item()
             
-            if i==50:
+            if i==3:
                 break
             
         l = i*args.batch_size 
@@ -234,7 +234,7 @@ def main():
     global_n = torch.nn.DataParallel(global_n).cuda()
     local_a = torch.nn.DataParallel(local_a).cuda()
     global_a = torch.nn.DataParallel(global_a).cuda()
-    model = torch.nn.DataParallel(model2).cuda()
+    model = torch.nn.DataParallel(model).cuda()
     model2 = torch.nn.DataParallel(model2).cuda()
 
     local_n.to(device)

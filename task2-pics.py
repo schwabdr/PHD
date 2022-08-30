@@ -4,6 +4,7 @@ Purpose of this file is to begin work on task 2 of my planned contribution
 '''
 from locale import locale_encoding_alias
 import os
+from re import A
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
@@ -51,25 +52,37 @@ eps = args.eps
 eps_iter = args.eps_iter
 nb_iter = args.nb_iter
 
+f = True
+a = []
+b = []
+
 '''
 There's plenty of CPU RAM (I think) so I'm going to stack the NumPy data on the CPU, and send it all here
 number of rows and columns you want: pick 2x as many columns as you want images b/c you'll have clean / adv example alternating
 '''
 def show_img_grid(rows, cols, x, x_adv, y, y_adv):
     fig, axes1 = plt.subplots(rows,cols,figsize=(5,5))
-    lst = list(range(0, len(x)))
-    random.shuffle(lst)
+    global f
+    global a
+    global b
+    if f:
+        lst = list(range(0, len(x)))
+        random.shuffle(lst)
+        a = lst.copy()
+        b = lst.copy()
+        f = False
     #print("min/max of numpy arrays: ", np.min(x), np.max(x)) #this was very close to 0 and 1
     for j in range(rows):
         for k in range(0,cols,2):
             #get a random index
-            i = lst.pop()
+            i = a.pop()
             axes1[j][k].set_axis_off()
             axes1[j][k+1].set_axis_off()
             axes1[j][k].imshow(x[i],interpolation='nearest')
             axes1[j][k].text(0,0,classes[y[i]]) # this gets the point accross but needs fixing.
             axes1[j][k+1].imshow(x_adv[i], interpolation='nearest')
             axes1[j][k+1].text(0,0,classes[y_adv[i]])
+    a = b.copy()
     plt.show()
 
 

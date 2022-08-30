@@ -1,3 +1,7 @@
+################## SW Engineering ##################
+name each model appropriately
+use model_fns for list of models to pass between funcs
+
 ################## INFORMATION ##################
 I see now that they define a special forward function for resnet_new.py
 They can accept which layer's output they want to return ... and therefore they use this model
