@@ -41,8 +41,9 @@ stats = config.Configuration().getNormStats()
 #according to above link - we could adjust as we see fit -- I could get a little better performance 
 #if I increase batch size a bit. 
 # this batch size sits at 8593 MiB / 11019 MiB on GPU 0 
-args.batch_size=512 #672 was overloading GPU memory #may need to reduce. 2048 was too high 1024 too high
-#args.batch_size=32
+#args.batch_size=512 #672 was overloading GPU memory #may need to reduce. 2048 was too high 1024 too high
+
+args.batch_size=4
 #PGD Parameters
 eps = args.eps
 eps_iter = args.eps_iter
@@ -92,12 +93,11 @@ def craft_and_eval(models, device, test_loader):
         correct = 0
         correct_adv = 0
 
-        #eps_iter = .007
-        eps_iter = .005
+        eps_iter = .007
+        #eps_iter = .005
         #nb_iter = round(eps/eps_iter) + 10
-        nb_iter = 50
         #nb_iter = 50
-        #nb_iter = 100 #trying this since I can do it in parallel now
+        nb_iter = 100 
         print(f"Using PGD with eps: {eps}, eps_iter: {eps_iter}, nb_iter: {nb_iter}, alpha: {alpha}")
         #with torch.no_grad():
         i = 0
@@ -133,10 +133,14 @@ def craft_and_eval(models, device, test_loader):
             correct += pred.eq(target.view_as(pred)).sum().item()
             correct_adv += pred_adv.eq(target.view_as(pred_adv)).sum().item()
             
-            #if i==3:
-            #    break
-            #break # do one batch for quick test
-        print("Robust Accuracy: {:.5f}%".format(correct_adv / (i*args.batch_size)))
+            if i==50:
+                break
+            
+        l = i*args.batch_size 
+        if l > len(test_loader.dataset):
+            l = len(test_loader.dataset)
+        
+        print("Robust Accuracy: {:.5f}%".format(correct_adv / (l)))
         test_loss /= len(test_loader.dataset)
         print('Test: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%), Robust Accuracy: {}/{} ({:.0f}%)'.format(
             test_loss, correct, len(test_loader.dataset),

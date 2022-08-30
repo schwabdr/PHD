@@ -1,13 +1,8 @@
 '''
-Uses MI-Craft 
-
-Purpose of this file is to explore values of MI-Loss
-
-
-Perform experiment where we vary alpha. See equation 8 of 
-https://arxiv.org/abs/2207.12203
-
+Purpose of this file is to begin work on task 2 of my planned contribution
+2. Use the Mutual Information (MI) estimation networks as a metric to aid in the crafting of adversarial examples.
 '''
+from locale import locale_encoding_alias
 import os
 import torch
 import torch.nn.functional as F
@@ -15,6 +10,7 @@ import torch.optim as optim
 from torchvision import transforms
 import torchvision.models as models
 import torch.backends.cudnn as cudnn
+from torch.optim import lr_scheduler, Adam
 
 import numpy as np
 
@@ -33,6 +29,12 @@ from utils import config
 from utils import utils
 from utils.data import data_dataset #doing it this way avoids clash with variable named "data"
 
+import random
+#next is only needed to visualize samples
+import matplotlib
+matplotlib.use('tkagg')
+import matplotlib.pyplot as plt
+
 classes = ['plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
 
 args = config.Configuration().getArgs()
@@ -42,12 +44,36 @@ stats = config.Configuration().getNormStats()
 #according to above link - we could adjust as we see fit -- I could get a little better performance 
 #if I increase batch size a bit. 
 # this batch size sits at 8593 MiB / 11019 MiB on GPU 0 
-args.batch_size=672 #may need to reduce. 2048 was too high 1024 too high
+args.batch_size=512 #may need to reduce. 2048 was too high 1024 too high
 
 #PGD Parameters
 eps = args.eps
 eps_iter = args.eps_iter
 nb_iter = args.nb_iter
+
+'''
+There's plenty of CPU RAM (I think) so I'm going to stack the NumPy data on the CPU, and send it all here
+number of rows and columns you want: pick 2x as many columns as you want images b/c you'll have clean / adv example alternating
+'''
+def show_img_grid(rows, cols, x, x_adv, y, y_adv):
+    fig, axes1 = plt.subplots(rows,cols,figsize=(5,5))
+    lst = list(range(0, len(x)))
+    random.shuffle(lst)
+    #print("min/max of numpy arrays: ", np.min(x), np.max(x)) #this was very close to 0 and 1
+    for j in range(rows):
+        for k in range(0,cols,2):
+            #get a random index
+            i = lst.pop()
+            axes1[j][k].set_axis_off()
+            axes1[j][k+1].set_axis_off()
+            axes1[j][k].imshow(x[i],interpolation='nearest')
+            axes1[j][k].text(0,0,classes[y[i]]) # this gets the point accross but needs fixing.
+            axes1[j][k+1].imshow(x_adv[i], interpolation='nearest')
+            axes1[j][k+1].text(0,0,classes[y_adv[i]])
+    plt.show()
+
+
+
 
 def craft_and_eval(models, device, test_loader):
     if len(models) == 1:
@@ -82,11 +108,8 @@ def craft_and_eval(models, device, test_loader):
     #this is our L_infty constraint - added 1.5+ 
     eps_lst = [.025, .05, .075, .1, .125, .15, .175, .2, .25, .3, .4, .5, .75, 1.] #, 1.5, 2., 2.5] #stopping at 1
     #eps_lst = [.025, .05] # for quick test
-    #alpha_lst = [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,12.,13.,14.,15.]
 
     for eps in eps_lst:
-        alpha = 5.
-        #eps = .025
         print(25*'=')
         test_loss = 0
         correct = 0
@@ -95,7 +118,7 @@ def craft_and_eval(models, device, test_loader):
         eps_iter = .007
         nb_iter = round(eps/eps_iter) + 10
         #nb_iter = 100 #trying this since I can do it in parallel now
-        print(f"Using PGD with eps: {eps}, eps_iter: {eps_iter}, nb_iter: {nb_iter}, alpha: {alpha}")
+        print(f"Using PGD with eps: {eps}, eps_iter: {eps_iter}, nb_iter: {nb_iter}")
         #with torch.no_grad():
         i = 0
         for data, target in test_loader:
@@ -103,7 +126,7 @@ def craft_and_eval(models, device, test_loader):
             print(f"batch number {i}, {i*args.batch_size} / {len(test_loader.dataset)}")
             data, target = data.to(device), target.to(device)
             #pass all the models to the pgd function
-            data_adv = pgd(models, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=None, targeted=False, alpha=alpha)
+            data_adv = pgd(models, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=None, targeted=False)
             
             #x_adv = data_adv.detach().cpu().numpy().transpose(0,2,3,1) #I'll use this later - gonna paste all the images together.
             output = model(data)
@@ -114,6 +137,28 @@ def craft_and_eval(models, device, test_loader):
             correct += pred.eq(target.view_as(pred)).sum().item()
             correct_adv += pred_adv.eq(target.view_as(pred_adv)).sum().item()
             
+            
+            if True:#i%10 == 0:
+                x_test_clean = data.detach().cpu().numpy().transpose(0,2,3,1)
+                y_test_true = target.detach().cpu().numpy()
+                x_test_adv = data_adv.detach().cpu().numpy().transpose(0,2,3,1)
+                y_test_adv = pred_adv.detach().cpu().numpy()
+                # de normalize
+                x_test_clean = np.clip(((x_test_clean * stats[1]) + stats[0]),0,1.)
+                x_test_clean = (x_test_clean*255).astype(np.uint8)
+                x_test_adv = np.clip(((x_test_adv * stats[1]) + stats[0]),0,1.)
+                x_test_adv = (x_test_adv*255).astype(np.uint8)
+                
+                #x_test_adv is now [b][w][h][c] range of [0,255]
+                y_test_true = y_test_true.astype(np.uint8)
+                y_test_adv = y_test_adv.astype(np.uint8)
+                y_test_adv = y_test_adv.reshape((512))
+                show_img_grid(10,20, x_test_clean, x_test_adv, y_test_true, y_test_adv)
+                break
+
+
+            
+
             #break # do one batch for quick test
         test_loss /= len(test_loader.dataset)
         print('Test: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%), Robust Accuracy: {}/{} ({:.0f}%)'.format(
@@ -135,11 +180,10 @@ def main():
     if not os.path.exists(args.model_dir):
         os.makedirs(args.model_dir)
     
-    use_cuda = False#torch.cuda.is_available()
+    use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     
     print(f"device: {device}") #sanity check - using GPU
-    
 
     trans_test = transforms.Compose([
         transforms.ToTensor(),
@@ -170,19 +214,17 @@ def main():
         global_n = MI1x1ConvNet(z_size, args.va_hsize)
         global_a = MI1x1ConvNet(z_size, args.va_hsize)
 
-    l_n = 'local_n.1'
-    g_n = 'global_n.1'
-    l_a = 'local_a.1'
-    g_a = 'global_a.1'
-
-    local_n.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, l_n)))
-    global_n.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, g_n)))
-    local_a.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, l_a)))
-    global_a.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, g_a)))
-
-    print(f"Estimator Models Loaded: {l_n} {g_n} {l_a} {g_a}")
+    local_n.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'local_n')))
+    global_n.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'global_n')))
+    local_a.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'local_a')))
+    global_a.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'global_a')))
 
     
+    local_n.to(device)
+    global_n.to(device)
+    local_a.to(device)
+    global_a.to(device)
+
     local_n = torch.nn.DataParallel(local_n).cuda()
     global_n = torch.nn.DataParallel(global_n).cuda()
     local_a = torch.nn.DataParallel(local_a).cuda()
@@ -205,7 +247,7 @@ def main():
     model2 = torch.nn.DataParallel(model2).cuda() 
     model2.eval()
     
-    cudnn.benchmark = True #is this why it's so slow? surely not ... It was false - just changed it.
+    cudnn.benchmark = True
 
     print(f"Model loaded: {name}")
     print(f"Model loaded: {name2}")
@@ -216,7 +258,6 @@ def main():
     t_adv = []
     t_loss = []
     
-    '''
 
     print(64*'=')
     #           0      1       2        3        4         5
@@ -233,7 +274,7 @@ def main():
     print(adv_accuracy)
     print("total loss:")
     print(test_loss)
-    '''
+
     print(64*'=')
     #           0      1       2        3        4         5
     models = [model2, model2, local_n, local_a, global_n, global_a]
