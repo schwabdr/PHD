@@ -20,6 +20,12 @@ eps = 8/255.
 eps_iter = .007
 nb_iter = 40
 
+explanation for "dim" parameter on Tensors
+https://towardsdatascience.com/understanding-dimensions-in-pytorch-6edf9972d3be
+
+When testing the loss - I have found that using the STD-ResNet leads to a much higher value for loss_mea_n vs loss_mea_a when attacking MIAT-ResNet
+
+
 ################## CURRENT WORK ##################
 1) TRAIN RESNET18 FOR CIFAR 10 - NO AT - DONE
 2) Make train_MI_estimator.py more efficient. - DONE

@@ -1,24 +1,28 @@
 '''
-https://pytorch.org/docs/stable/generated/torch.cdist.html
-Computes batched the p-norm distance between each pair of the two collections of row vectors.
+9/2/22
+I had an epiphany of sorts - the reason loss_ce works so well is that by definition if you increase the loss for 
+the true class, you will reduce the loss for the other classes. This is not true of loss_mi.
+There is nothing mathematically that states (afaik) that reducing the MI of the correct class
+will increase the MI for any other class.
+It must be a targeted attack.
+Therefore - I believe to make loss_mi work as a metric for crafting adversarial examples, I will need to use 
+both the label AND X_clean of the class I want to move the X_target into for the loss_mi calculation.
+I define the following to keep my head on straight.
+X_adv_i -> current iteration of my adversarial example using this new method
+X_clean -> the clean sample that is also X_adv_0
+X_target -> a sample from a different class than X_clean. I want to make X_adv have same output prediction label as X_target
+y_adv_i -> current class label for X_adv_i
+y_true -> true class label for X_clean
+y_target -> class label for x_target. I want to make arg_max(h(x_adv)) = y_target (see eq 6 - not the same - but relevant)
+
+
+
 
 The purpose of this file is to study the loss metrics used for MIAT/NAMID
 
 Currently the only loss metric is cosine_loss = | 1 - cos_sim(a,b) |
 One issue is that this only considers the angle between the two vectors, a,b. It does not consider the magnitude.
 So it seems we are leaving some room on the table so to speak for adversarial examples to grow.
-More specifically, the maximum cosine loss is 2, this occurs when 2 vectors are 180 degress apart.
-Therefore, in this file I also add euclidean loss as a metric:
-
-torch.sqrt(sum((loss_n - loss_a)**2))
-
-I've learned from this file:
-1) cosine loss has a range of [0,2]
-2) can use euclidean distance as an additional metric
-3) maximizing the loss_mi does not necessarily decrease the loss_mi for the other class labels
-4) So i'm saving this file as it is - I've got some good data here I can reproduce.
-5) moving on to loss_study_targeted.py
-
 
 '''
 import os
