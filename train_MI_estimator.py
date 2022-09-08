@@ -204,7 +204,7 @@ def eval_test(model, device, test_loader, local_n, global_n, local_a, global_a):
     losses_a_n = 0
     losses_a_a = 0
 
-    first = False
+    first = False #False to disable display 
     for data, data_adv, target in test_loader:
         cnt += 1
         data, data_adv, target = data.to(device), data_adv.to(device), target.to(device)
@@ -326,16 +326,17 @@ def main():
     target_model = ResNet18(10)
     name = 'resnet-new-100' #input("Name of model to load: ") #for now I'll hard code so I don't have to retype the name while prototyping
     print(f"Target Model Loaded (encoder): {name}")
-    #target_model = target_model.load_statetorch.load(os.path.join(args.SAVE_MODEL_PATH, name))
-    #target_model = model = models.resnet18()
     target_model.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, name)))
     target_model.to(device)
-    #target_model.eval()
-
-
+    
     #I'm going to leave it in - hope it works (next two lines were commented out by me ...)
     target_model = torch.nn.DataParallel(target_model).cuda() #don't think I need this for eval
     target_model.eval()
+
+    local_n.to(device)
+    global_n.to(device)
+    local_a.to(device)
+    global_a.to(device)
 
     local_n = torch.nn.DataParallel(local_n).cuda()
     global_n = torch.nn.DataParallel(global_n).cuda()
@@ -349,7 +350,6 @@ def main():
     opt_global_n, schedule_global_n = make_optimizer_and_schedule(global_n, lr=args.lr_mi)
     opt_local_a, schedule_local_a = make_optimizer_and_schedule(local_a, lr=args.lr_mi)
     opt_global_a, schedule_global_a = make_optimizer_and_schedule(global_a, lr=args.lr_mi)
-
    
     first = False
     # Train
@@ -455,10 +455,10 @@ def main():
         print('================================================================')
     # no need to save target - it is not changed by this process.
     print("Saving estimator models ...")
-    utils.save_model(local_n, 'local_n.5')
-    utils.save_model(global_n, 'global_n.5')
-    utils.save_model(local_a, 'local_a.5')
-    utils.save_model(global_a, 'global_a.5')
+    utils.save_model(local_n, 'local_n.25')
+    utils.save_model(global_n, 'global_n.25')
+    utils.save_model(local_a, 'local_a.25')
+    utils.save_model(global_a, 'global_a.25')
     print("Save Complete. Exiting ...")
 
 if __name__ == '__main__':

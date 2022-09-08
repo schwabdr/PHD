@@ -39,6 +39,8 @@ eps = args.eps
 eps_iter = args.eps_iter
 nb_iter = args.nb_iter
 
+args.batch_size = 768 #default is 256 - try for more GPU utilization
+
 print(f"Using PGD with eps: {eps}, eps_iter: {eps_iter}, nb_iter: {nb_iter}")
 
 #I don't think this is even used ... should remove it
@@ -157,7 +159,7 @@ def MI_loss(i, model, x_natural, y, x_adv, local_n, global_n, local_a, global_a,
         loss_a = compute_loss(args=args, former_input=x_natural, latter_input=x_adv, encoder=model,
                                dim_local=local_n, dim_global=global_n, v_out=True) * index
 
-        # loss_a_all = loss_a
+        loss_a_all = loss_a
         loss_mea_n = torch.abs(torch.tensor(1.0).cuda() - torch.cosine_similarity(loss_n, loss_a, dim=0))
 
 
@@ -167,11 +169,14 @@ def MI_loss(i, model, x_natural, y, x_adv, local_n, global_n, local_a, global_a,
         loss_n = compute_loss(args=args, former_input=x_adv - x_natural, latter_input=x_natural, encoder=model,
                               dim_local=local_a, dim_global=global_a, v_out=True) * index
 
-        # loss_a_all = torch.tensor(0.1).cuda() * (loss_a_all - loss_a)
+        loss_a_all = (loss_a_all - loss_a)
+        loss_a_all = loss_a_all.sum()/(torch.nonzero(index).size(0))
+        loss_a_all = torch.abs(torch.tensor(.1).cuda() * loss_a_all)
+
         loss_mea_a = torch.abs(torch.tensor(1.0).cuda() - torch.cosine_similarity(loss_n, loss_a, dim=0))
 
 
-        loss_mi = loss_mea_n + loss_mea_a # + loss_a_all
+        loss_mi = loss_mea_n + loss_mea_a  + loss_a_all
 
     else:
         loss_mi = 0.0
@@ -182,7 +187,6 @@ def MI_loss(i, model, x_natural, y, x_adv, local_n, global_n, local_a, global_a,
         print('select samples:' + str(torch.nonzero(index).size(0)))
         print('Epoch [%d], Iter [%d/%d] Train target model. Natural MI: %.4f; Loss_ce: %.4f; Loss_all: %.4f'
               % (epoch, i + 1, 50000 // args.batch_size, loss_mi.item(), loss_ce.item(), loss_all.item()))
-
     return loss_all
 
 
@@ -367,22 +371,21 @@ def main():
         global_n = MI1x1ConvNet(z_size, args.va_hsize)
         global_a = MI1x1ConvNet(z_size, args.va_hsize)
 
-    #TODO start here when I get back to this file ... sigh
     target_model = ResNet18(10)
     #target_model = WideResNet(34, 10, 10)
+    target_model.to(device)
     target_model = torch.nn.DataParallel(target_model).cuda()
 
-    local_n.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'local_n')))
-    global_n.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'global_n')))
-    local_a.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'local_a')))
-    global_a.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'global_a')))
+    local_n.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'local_n.25')))
+    global_n.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'global_n.25')))
+    local_a.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'local_a.25')))
+    global_a.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, 'global_a.25')))
 
-    ''' #original lines to load - didn't work
-    local_n.load_state_dict(torch.load(args.pre_local_n))
-    global_n.load_state_dict(torch.load(args.pre_global_n))
-    local_a.load_state_dict(torch.load(args.pre_local_a))
-    global_a.load_state_dict(torch.load(args.pre_global_a))
-    '''
+    local_n = local_n.to(device)
+    global_n = global_n.to(device)
+    local_a = local_a.to(device)
+    global_a = global_a.to(device)
+
     local_n = torch.nn.DataParallel(local_n).cuda()
     global_n = torch.nn.DataParallel(global_n).cuda()
     local_a = torch.nn.DataParallel(local_a).cuda()
@@ -390,13 +393,8 @@ def main():
 
     cudnn.benchmark = True
 
-    #TODO try adam optimizer here
-    optimizer = optim.SGD(target_model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-
-    # opt_local_n, schedule_local_n = make_optimizer_and_schedule(local_n, lr=args.lr_mi)
-    # opt_global_n, schedule_global_n = make_optimizer_and_schedule(global_n, lr=args.lr_mi)
-    # opt_local_a, schedule_local_a = make_optimizer_and_schedule(local_a, lr=args.lr_mi)
-    # opt_global_a, schedule_global_a = make_optimizer_and_schedule(global_a, lr=args.lr_mi)
+    #optimizer = optim.SGD(target_model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+    optimizer = optim.Adam(target_model.parameters(), lr=args.lr)
 
     # warm up
     print('--------Warm up--------')
@@ -419,6 +417,7 @@ def main():
     best_accuracy = 0
     for epoch in range(1, args.epochs + 1):
         adjust_learning_rate(optimizer, epoch)
+        print(f"epoch: {epoch}")
 
         print('--------Train the target model--------')
 
@@ -440,29 +439,20 @@ def main():
         # evaluation
         print('--------Evaluate the target model--------')
 
+        #we don't need to evaluate every epoch - this will speed it up
+        '''
         test_accuracy = eval_test(model=target_model, device=device, test_loader=test_loader, local_n=local_n,
                                   global_n=global_n, local_a=local_a, global_a=global_a)
 
         # save checkpoint
         if test_accuracy >= best_accuracy:  # epoch % args.save_freq == 0:
             best_accuracy = test_accuracy
-            '''
-            torch.save(model.module.state_dict(),
-                       os.path.join(model_dir, 'model-epoch{}.pt'.format(epoch)))
-            '''
-
             torch.save(target_model.module.state_dict(),
                        os.path.join(args.model_dir, 'target_model.pth'))
-            '''
-            torch.save(local_n.module.state_dict(),
-                       os.path.join(args.model_dir, 'local_model.pth'))
-            torch.save(global_n.module.state_dict(),
-                       os.path.join(args.model_dir, 'global_model.pth'))
-            '''
             print('save the model')
-
+        '''
         print('================================================================')
-    name = 'resnet-new-100-MIAT-from-scratch'
+    name = 'resnet-new-100-MIAT-0.25-from-scratch'
     print(40*'=')
     print(f"Saving model as {name}.")
     utils.save_model(target_model, name)
