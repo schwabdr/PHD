@@ -63,7 +63,7 @@ def main():
     device = torch.device("cuda" if use_cuda else "cpu")
 
     #set the model name here you want to evaluate
-    name = 'resnet-new-100' #input("Name of model to load: ") #for now I'll hard code 
+    name = 'resnet-new-100-MIAT-0.25-from-scratch' #input("Name of model to load: ") #for now I'll hard code 
     model = ResNet18(10)
     path = str(os.path.join(args.SAVE_MODEL_PATH, name))
     

@@ -1,3 +1,18 @@
+################## DETAILS #########################
+I should have taken better notes - 
+
+I will assume at this point all 3 adv datasets are constructed from the resnet-new-100 model
+nb_iters = 50 for all, eps_iter = .007
+adv_test_images.npy (.03137 or 8/255)
+adv_test_images.1.npy
+adv_test_images.25.npy
+(also adv_train for all datasets)
+
+global_a, global_n - .03137 trained from datasets above
+global_a.1, global_a.25 (same)
+
+
+
 ################## SW Engineering ##################
 name each model appropriately
 use model_fns for list of models to pass between funcs

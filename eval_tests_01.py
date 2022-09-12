@@ -1,6 +1,7 @@
 '''
 Purpose of this file is to evaluate any given model with adversarial examples given by any model.
 Both models can be the same for a white box evaluation.
+We will test all three MIAT/NAMID models using a range of epsilon values and nb_iter = 100 in all cases.
 '''
 import os
 import argparse
@@ -14,7 +15,7 @@ import numpy as np
 
 from utils import config
 from utils import data
-import projected_gradient_descent as pgd
+from projected_gradient_descent import projected_gradient_descent as pgd
 from models.resnet_new import ResNet18
 
 #next is only needed to visualize samples
@@ -76,7 +77,7 @@ def eval_test_w_adv(model, device, test_loader, model_adv=None):
     '''
     
     #this is our L_infty constraint - added 1.5+ 
-    eps_lst = [.025, .05, .075, .1, .125, .15, .175, .2, .25, .3, .4, .5, .75, 1., 1.5, 2., 2.5]
+    eps_lst = [.025, .05, .075, .1, .125, .15, .175, .2, .25, .3, .4, .5, .75, 1.] #, 1.5, 2., 2.5]
     #eps_lst = [.025, .05] # for quick test
 
     for eps in eps_lst:
@@ -87,12 +88,12 @@ def eval_test_w_adv(model, device, test_loader, model_adv=None):
 
         eps_iter = .007
         #nb_iter = round(eps/eps_iter) + 10
-        nb_iter = 100 #trying this since I can do it in parallel now
+        nb_iter = 100
         print(f"Using PGD with eps: {eps}, eps_iter: {eps_iter}, nb_iter: {nb_iter}")
         #with torch.no_grad():
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
-            data_adv = pgd.projected_gradient_descent(model_adv, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=None, targeted=False)
+            data_adv = pgd(model_adv, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=None, targeted=False)
             
             #x_adv = data_adv.detach().cpu().numpy().transpose(0,2,3,1) #I'll use this later - gonna paste all the images together.
             output = model(data)
@@ -131,24 +132,16 @@ def main():
     #TODO add choice to specify two models, one to generate examples, and one to evaluate, i.e. blackbox evaluation
     # current task - load MIAT model and model below, compare them.
     # for now we just use one model.
-    name = 'resnet-new-100' #input("Name of model to load: ") #for now I'll hard code the only model I have trained
-    name2 = 'resnet-new-100-MIAT-from-scratch'
-    model = ResNet18(10)
-    model2 = ResNet18(10)
-    path = str(os.path.join(args.SAVE_MODEL_PATH, name))
+    name = 'resnet-new-100-MIAT-0.25-from-scratch' #input("Name of model to load: ") #for now I'll hard code the only model I have trained
     
+    model = ResNet18(10)
+   
     model.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, name)))
     model.to(device)
     model = torch.nn.DataParallel(model).cuda() 
     model.eval()
 
-    model2.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, name2)))
-    model2.to(device)
-    model2 = torch.nn.DataParallel(model2).cuda() 
-    model2.eval()
-
     print(f"Model loaded: {name}")
-    print(f"Model loaded: {name2}")
     
     trans_test = transforms.Compose([
         transforms.ToTensor(),
@@ -175,42 +168,6 @@ def main():
     print("total loss:")
     print(test_loss)
     
-    
-    print(64*'=')
-    test_loss, test_accuracy, adv_accuracy = eval_test_w_adv(model2, device, test_loader, model_adv=model2)
-    t_acc.append(test_accuracy)
-    t_loss.append(test_loss)
-    t_adv.append(adv_accuracy)
-    print("total acc:")
-    print(test_accuracy)
-    print("total adv acc:")
-    print(adv_accuracy)
-    print("total loss:")
-    print(test_loss)
-    
-    print(64*'=')
-    test_loss, test_accuracy, adv_accuracy = eval_test_w_adv(model, device, test_loader, model_adv=model2)
-    t_acc.append(test_accuracy)
-    t_loss.append(test_loss)
-    t_adv.append(adv_accuracy)
-    print("total acc:")
-    print(test_accuracy)
-    print("total adv acc:")
-    print(adv_accuracy)
-    print("total loss:")
-    print(test_loss)
-    
-    print(64*'=')
-    test_loss, test_accuracy, adv_accuracy = eval_test_w_adv(model2, device, test_loader, model_adv=model)
-    t_acc.append(test_accuracy)
-    t_loss.append(test_loss)
-    t_adv.append(adv_accuracy)
-    print("total acc:")
-    print(test_accuracy)
-    print("total ADV acc:")
-    print(adv_accuracy)
-    print("total loss:")
-    print(test_loss)
     
     
     print(64*'=')
