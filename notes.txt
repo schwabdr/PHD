@@ -1,7 +1,14 @@
 ################## DETAILS #########################
+When I move to new datasets - I'll need to 
+1) train
+2) eval_baseline.py
+3) eval_tests_01.py (change to each of the 4 models)
+4) eval_tests_01_targeted.py (only choose one model if it makes sense)
+
 I should have taken better notes - 
 
 I will assume at this point all 3 adv datasets are constructed from the resnet-new-100 model
+"make_adv_examples.py" created all 3 datasets (and the .5 dataset which I'm not using so far)
 nb_iters = 50 for all, eps_iter = .007
 adv_test_images.npy (.03137 or 8/255)
 adv_test_images.1.npy
@@ -11,7 +18,7 @@ adv_test_images.25.npy
 global_a, global_n - .03137 trained from datasets above
 global_a.1, global_a.25 (same)
 
-
+eval_baseline.py
 
 ################## SW Engineering ##################
 name each model appropriately

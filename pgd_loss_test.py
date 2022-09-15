@@ -1,4 +1,7 @@
 '''
+This file was committed and never changed - so I don't think I've actually used this file for anything.
+
+
 This is my attempt to use the MI loss instead of cross-entropy alone to construct adversarial examples.
 The 'challenge' is that the MI loss requires multiple more paramaters ... so I'll have to change these functions a bit.
 The other challenge is that to compute this loss you require an actual adversarial example. Thus I propose the following.

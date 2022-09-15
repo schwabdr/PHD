@@ -2,9 +2,10 @@
 Purpose of this file is to evaluate any given model with adversarial examples given by any model.
 Both models can be the same for a white box evaluation.
 We will test all three MIAT/NAMID models using a range of epsilon values and nb_iter = 100 in all cases.
+The point of this file is to obtain the second most likely predicted class for each image, and produce a targeted attack
+towards that label. It will be the second highest value of the softmax output layer.
 '''
 import os
-import argparse
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
@@ -30,7 +31,7 @@ classes = ['plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship'
 args = config.Configuration().getArgs()
 stats = config.Configuration().getNormStats()
 
-#args.batch_size=512 #trying this
+#use 2048 here
 args.batch_size=2048 #trying this - this works with the data parallel - GPU util ~95%, memory 10800/11019 MB each GPU
 
 '''
@@ -79,6 +80,7 @@ def eval_test_w_adv(model, device, test_loader, model_adv=None):
     #this is our L_infty constraint - added 1.5+ 
     eps_lst = [.025, .05, .075, .1, .125, .15, .175, .2, .25, .3, .4, .5, .75, 1.] #, 1.5, 2., 2.5]
     #eps_lst = [.025, .05] # for quick test
+    #eps_lst = [.025]
 
     for eps in eps_lst:
         print(25*'=')
@@ -93,10 +95,21 @@ def eval_test_w_adv(model, device, test_loader, model_adv=None):
         #with torch.no_grad():
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
-            data_adv = pgd(model_adv, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=None, targeted=False)
+            output = model(data)
+            #print("output:")
+            #print(output)
+            #print("target:")
+            #print(target)
+            top2 = torch.topk(output, 2) # get values / indices for top 2 classes
+            #print(top2)
+            y_target = torch.select(top2.indices, 1, 1) #y_target is second most likely class
+            #print("y_target")
+            #print(y_target)
+            
+            data_adv = pgd(model_adv, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=y_target, targeted=True)
             
             #x_adv = data_adv.detach().cpu().numpy().transpose(0,2,3,1) #I'll use this later - gonna paste all the images together.
-            output = model(data)
+            #output = model(data)
             output_adv = model(data_adv)
             test_loss += F.cross_entropy(output, target, reduction='sum').item()
             pred = output.max(1, keepdim=True)[1]
