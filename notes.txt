@@ -1,9 +1,10 @@
 ################## DETAILS #########################
 When I move to new datasets - I'll need to 
-1) train
+1) train - train_standard, train_MI_estimator, train_MIAT_alpha
 2) eval_baseline.py
 3) eval_tests_01.py (change to each of the 4 models)
 4) eval_tests_01_targeted.py (only choose one model if it makes sense)
+5) eval_tests_02.py (based off of previous loss_study.py)
 
 I should have taken better notes - 
 

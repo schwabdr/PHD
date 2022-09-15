@@ -1,4 +1,15 @@
 '''
+The purpose of this new file: eval_tests_02.py
+1) Evaluate MI-Craft under same LOSS function as NAMID/MIAT
+2) Evalute MI-Craft using ALL samples for LOSS_MI not just the samples that are misclassified by the target.
+3) Adaptively switch between Euclidean loss and cosine loss.
+4) Perform targeted attacks.
+5) Two phases - non-targeted attack phase then targeted attack phase.
+
+
+
+
+original notes from loss_study.py
 https://pytorch.org/docs/stable/generated/torch.cdist.html
 Computes batched the p-norm distance between each pair of the two collections of row vectors.
 
