@@ -9,7 +9,7 @@ The purpose of this new file: eval_tests_02.py
 
 
 
-original notes from loss_study.py
+#################### original notes from loss_study.py BELOW THIS LINE ###############################
 https://pytorch.org/docs/stable/generated/torch.cdist.html
 Computes batched the p-norm distance between each pair of the two collections of row vectors.
 
@@ -67,19 +67,12 @@ args = config.Configuration().getArgs()
 stats = config.Configuration().getNormStats() #
 classes = config.Configuration().getClasses()
 
-args.batch_size = 512
+args.batch_size = 512 #512 worked, so did wierd, this time 704 crashed
 
 #####################################################
 #THIS CODE IS FROM train_MIAT_alpha.py
 #####################################################
 '''
-This should be wrapped up in a utils file or something ... but for now I'll just duplicate some code and get it working ...
-'''
-
-'''
-Robust Accuracy: 24.950%
-Test: Average loss: 0.0034, Accuracy: 9997/10000 (100%), Robust Accuracy: 2495/10000 (25%)
-Using PGD with eps: 0.15, eps_iter: 0.007, nb_iter: 50
 
 Name of this function is perhaps misleading as it gives TOTAL loss, not just the MI loss.
 This will be my first test - a baseline. Once I tune it I'll work on other losses.
@@ -87,627 +80,75 @@ Uses the same MI_loss that is used for MIAT/NAMID training (CE+3MI-Terms)
 :param model_fns: models for calculating loss
 :param alpha: (optional) float. Hyper parameter for tuning the MI portion of loss.
 '''
-def MI_loss_test01(model_fns, x_natural, x_adv, y_true, iter=iter):
-    #this setting 
-    # typical layout for model_fns
-    #               0        1         2        3         4        5
-    #model_fns = {std_res, miat_res, local_n, global_n, local_a, global_a}
-    target_model = model_fns[1] #target model to calculate loss
-    encoder = model_fns[0] # model to use as encoder
-    local_n = model_fns[2]
-    global_n = model_fns[3]
-    local_a = model_fns[4]
-    global_a = model_fns[5]
-    #all models should already be in eval() mode
-    alpha = 1.
-    lambd = .1
-    #print(f"alpha: {alpha}, lambda: {lambd}")
-
-    logits_adv = target_model(x_adv) # current pred of the model we are attacking
-    loss_ce = F.cross_entropy(logits_adv, y_true)
-
-    #code snippet to select the indices of adv examples that are misclassified and clean samples that
-    # are correctly classified
-    pseudo_label = F.softmax(target_model(x_natural), dim=0).max(1, keepdim=True)[1].squeeze()
-    index = (pseudo_label == y_true)
-    pseudo_label = F.softmax(target_model(x_adv), dim=0).max(1, keepdim=True)[1].squeeze()
-    index = index * (pseudo_label != y_true)
-
-    #init vars for print in case we hit the "else"
-    loss_mea_n = 0
-    loss_mea_a = 0
-    loss_a_all = 0
-    
-    if torch.nonzero(index).size(0) != 0:
-        loss_n = compute_loss(args=args, former_input=x_natural, latter_input=x_natural, encoder=encoder,
-                dim_local=local_n, dim_global=global_n, v_out=True)* index
-
-        loss_a = compute_loss(args=args, former_input=x_natural, latter_input=x_adv, encoder=encoder,
-                               dim_local=local_n, dim_global=global_n, v_out=True) * index
-
-        loss_a_all = loss_a # for the 3rd term
-        loss_mea_n = torch.abs(torch.tensor(1.0).cuda() - torch.cosine_similarity(loss_n, loss_a, dim=0))
-
-
-        loss_a = compute_loss(args=args, former_input=x_adv - x_natural, latter_input=x_adv, encoder=encoder,
-                              dim_local=local_a, dim_global=global_a, v_out=True) * index
-
-        loss_n = compute_loss(args=args, former_input=x_adv - x_natural, latter_input=x_natural, encoder=encoder,
-                              dim_local=local_a, dim_global=global_a, v_out=True) * index
-        
-        # I changed the order of subtraction here to match the paper as far as I can tell eqn 8
-        loss_a_all = loss_a - loss_a_all
-        loss_a_all = loss_a_all.sum()/(torch.nonzero(index).size(0))
-        loss_a_all = torch.abs(torch.tensor(lambd).cuda() * loss_a_all)
-        
-        loss_mea_a = torch.abs(torch.tensor(1.0).cuda() - torch.cosine_similarity(loss_n, loss_a, dim=0))
-
-        loss_mi = loss_mea_n + loss_mea_a + loss_a_all #see eqn 8
-    else:
-        loss_mi = 0.0
-        
-        
-    loss_all = loss_ce + torch.tensor(alpha).cuda() * loss_mi
-    print(f"loss_all: {loss_all}, loss_ce: {loss_ce}, loss_mea_n: {loss_mea_n}, loss_mea_a: {loss_mea_a}, loss_a_all: {loss_a_all}")
-    return loss_all
 
 '''
-Robust Accuracy: 25.20000%
-Test: Average loss: 0.0034, Accuracy: 9997/10000 (100%), Robust Accuracy: 2520/10000 (25%)
+MI_loss - use original MIAT training
 
-For a single batch:
-Robust Accuracy: 24.60938% 
-Test: Average loss: 0.0001, Accuracy: 512/10000 (5%), Robust Accuracy: 126/10000 (1%)
-Using PGD with eps: 0.15, eps_iter: 0.007, nb_iter: 50
-
-Name of this function is perhaps misleading as it gives TOTAL loss, not just the MI loss.
-This is the first version of MI_loss_testXX that incorporates a euclidean distance metric
-between the MI vectors - I'm not convinced it helps - but it doesn't hurt. See stats above.
-
-:param model_fns: models for calculating loss
-:param alpha: (optional) float. Hyper parameter for tuning the MI portion of loss.
-'''
-
-def MI_loss_test02(model_fns, x_natural, x_adv, y_true):
-    #this setting 
-    # typical layout for model_fns
-    #               0        1         2        3         4        5
-    #model_fns = [std_res, miat_res, local_n, global_n, local_a, global_a]
-    target_model = model_fns[1] #target model to calculate loss
-    encoder = model_fns[0] # model to use as encoder
-    local_n = model_fns[2]
-    global_n = model_fns[3]
-    local_a = model_fns[4]
-    global_a = model_fns[5]
-    #all models should already be in eval() mode
-    alpha = 1.
-    lambd = 1.
-    #print(f"alpha: {alpha}, lambda: {lambd}")
-    global euc_flag
-
-    logits_adv = target_model(x_adv) # current pred of the model we are attacking
-    loss_ce = F.cross_entropy(logits_adv, y_true)
-
-    #code snippet to select the indices of adv examples that are misclassified and clean samples that
-    # are correctly classified
-    pseudo_label = F.softmax(target_model(x_natural), dim=0).max(1, keepdim=True)[1].squeeze()
-    index = (pseudo_label == y_true)
-    pseudo_label = F.softmax(target_model(x_adv), dim=0).max(1, keepdim=True)[1].squeeze()
-    index = index * (pseudo_label != y_true)
-
-    #init vars for print in case we hit the "else"
-    loss_mea_n = 0
-    loss_mea_a = 0
-    loss_a_all = 0
-    loss_euclid_mea_n = 0
-    loss_euclid_mea_a = 0
-    
-    if torch.nonzero(index).size(0) != 0:
-        loss_n = compute_loss(args=args, former_input=x_natural, latter_input=x_natural, encoder=encoder,
-                dim_local=local_n, dim_global=global_n, v_out=True)* index
-
-        loss_a = compute_loss(args=args, former_input=x_natural, latter_input=x_adv, encoder=encoder,
-                               dim_local=local_n, dim_global=global_n, v_out=True) * index
-
-        loss_euclid_mea_n = torch.sqrt(sum((loss_n - loss_a)**2))
-        
-        #print(f"loss_n.size(): {loss_n.size()}, loss_a.size() {loss_a.size()}") #loss_n.size(): torch.Size([512]), loss_a.size() torch.Size([512])
-
-        loss_a_all = loss_a # for the 3rd term
-        loss_mea_n = torch.abs(torch.tensor(1.0).cuda() - torch.cosine_similarity(loss_n, loss_a, dim=0))
-
-
-        loss_a = compute_loss(args=args, former_input=x_adv - x_natural, latter_input=x_adv, encoder=encoder,
-                              dim_local=local_a, dim_global=global_a, v_out=True) * index
-
-        loss_n = compute_loss(args=args, former_input=x_adv - x_natural, latter_input=x_natural, encoder=encoder,
-                              dim_local=local_a, dim_global=global_a, v_out=True) * index
-
-        loss_euclid_mea_a = torch.sqrt(sum((loss_n - loss_a)**2))
-        #print(f"loss_euclid_mea_n: {loss_euclid_mea_n}, loss_euclid_mea_a: {loss_euclid_mea_a}")
-        
-        #print(f"loss_n.size(): {loss_n.size()}, loss_a.size() {loss_a.size()}") #loss_n.size(): torch.Size([512]), loss_a.size() torch.Size([512])
-
-        # I changed the order of subtraction here to match the paper as far as I can tell eqn 8
-        loss_a_all = loss_a - loss_a_all
-        loss_a_all = loss_a_all.sum()/(torch.nonzero(index).size(0))
-        loss_a_all = torch.abs(torch.tensor(lambd).cuda() * loss_a_all)
-        
-        loss_mea_a = torch.abs(torch.tensor(1.0).cuda() - torch.cosine_similarity(loss_n, loss_a, dim=0))
-
-        '''
-        if euc_flag: #switch to euclidean distance
-            loss_mi = .01*loss_euclid_mea_n + .1*loss_euclid_mea_a
-            euc_flag = True # each batch will need to reset this to False
-        else:
-            loss_mi = loss_mea_n + loss_mea_a + loss_a_all #see eqn 8
-            if loss_mea_a > 1.6 and loss_mea_n > 1.6:
-                euc_flag = True
-        '''
-        loss_mi = loss_mea_n + loss_mea_a + loss_a_all + .01*loss_euclid_mea_n + .1*loss_euclid_mea_a
-        #loss_mi = loss_euclid_mea_a + loss_euclid_mea_n
-
-    else:
-        loss_mi = 0.0
-        
-        
-    loss_all = loss_ce + torch.tensor(alpha).cuda() * loss_mi
-    print(f"loss_all: {loss_all}, loss_ce: {loss_ce}, loss_mea_n: {loss_mea_n}, loss_mea_a: {loss_mea_a}, loss_a_all: {loss_a_all}, euc_n: {loss_euclid_mea_n}, euc_a: {loss_euclid_mea_a}")
-    return loss_all
-
-'''
-test03
-Note here are we using the MIAT for encoder (I tried using STD for encoder and it performed worse)
-1st Run:
-Robust Accuracy: 21.90000%
-Test: Average loss: 0.0034, Accuracy: 9997/10000 (100%), Robust Accuracy: 2190/10000 (22%)
-2nd Run:
-Robust Accuracy: 21.94000%
-Test: Average loss: 0.0034, Accuracy: 9997/10000 (100%), Robust Accuracy: 2194/10000 (22%)
-
-
-For a single batch:
-Robust Accuracy: 23.04688%
-Test: Average loss: 0.0001, Accuracy: 512/10000 (5%), Robust Accuracy: 118/10000 (1%)
-
-Using PGD with eps: 0.15, eps_iter: 0.007, nb_iter: 50
-
-Name of this function is perhaps misleading as it gives TOTAL loss, not just the MI loss.
-This is the first version of MI_loss_testXX that incorporates a euclidean distance metric
-between the MI vectors - I'm not convinced it helps - but it doesn't hurt. See stats above.
-
-:param model_fns: models for calculating loss
-:param alpha: (optional) float. Hyper parameter for tuning the MI portion of loss.
-'''
-
-def MI_loss_test03(model_fns, x_natural, x_adv, y_true, iter=0):
-    #this setting 
-    # typical layout for model_fns
-    #               0        1         2        3         4        5
-    #model_fns = [std_res, miat_res, local_n, global_n, local_a, global_a]
-    target_model = model_fns[1] #target model to calculate loss
-    encoder = model_fns[1] # model to use as encoder
-    local_n = model_fns[2]
-    global_n = model_fns[3]
-    local_a = model_fns[4]
-    global_a = model_fns[5]
-    #all models should already be in eval() mode
-    alpha = 1.
-    lambd = .1
-    #print(f"alpha: {alpha}, lambda: {lambd}")
-    global euc_flag
-
-    logits_adv = target_model(x_adv) # current pred of the model we are attacking
-    loss_ce = F.cross_entropy(logits_adv, y_true)
-
-    #code snippet to select the indices of adv examples that are misclassified and clean samples that
-    # are correctly classified
-    pseudo_label = F.softmax(target_model(x_natural), dim=0).max(1, keepdim=True)[1].squeeze()
-    index = (pseudo_label == y_true)
-    pseudo_label = F.softmax(target_model(x_adv), dim=0).max(1, keepdim=True)[1].squeeze()
-    index = index * (pseudo_label != y_true)
-
-    #init vars for print in case we hit the "else"
-    loss_mea_n = 0
-    loss_mea_a = 0
-    loss_a_all = 0
-    loss_euclid_mea_n = 0
-    loss_euclid_mea_a = 0
-    
-    if torch.nonzero(index).size(0) != 0:
-        loss_n = compute_loss(args=args, former_input=x_natural, latter_input=x_natural, encoder=encoder,
-                dim_local=local_n, dim_global=global_n, v_out=True)* index
-
-        loss_a = compute_loss(args=args, former_input=x_natural, latter_input=x_adv, encoder=encoder,
-                               dim_local=local_n, dim_global=global_n, v_out=True) * index
-
-        loss_euclid_mea_n = torch.sqrt(sum((loss_n - loss_a)**2))
-        
-        loss_a_all = loss_a # for the 3rd term
-        loss_mea_n = torch.abs(torch.tensor(1.0).cuda() - torch.cosine_similarity(loss_n, loss_a, dim=0))
-
-
-        loss_a = compute_loss(args=args, former_input=x_adv - x_natural, latter_input=x_adv, encoder=encoder,
-                              dim_local=local_a, dim_global=global_a, v_out=True) * index
-
-        loss_n = compute_loss(args=args, former_input=x_adv - x_natural, latter_input=x_natural, encoder=encoder,
-                              dim_local=local_a, dim_global=global_a, v_out=True) * index
-
-        loss_euclid_mea_a = torch.sqrt(sum((loss_n - loss_a)**2))
-        
-        # I changed the order of subtraction here to match the paper as far as I can tell eqn 8
-        loss_a_all = loss_a - loss_a_all
-        loss_a_all = loss_a_all.sum()/(torch.nonzero(index).size(0))
-        loss_a_all = torch.abs(torch.tensor(lambd).cuda() * loss_a_all)
-        
-        loss_mea_a = torch.abs(torch.tensor(1.0).cuda() - torch.cosine_similarity(loss_n, loss_a, dim=0))
-
-        #here we do different loss depending on how far along we are.
-        if iter < 10:
-            loss_all = loss_ce
-        elif iter < 25: #add in cosine based MI_loss 
-            loss_all = loss_ce + loss_mea_n + loss_mea_a + loss_a_all
-        else: #switch cosine based for euclidean based MI_loss
-            loss_all = loss_ce + .01*loss_euclid_mea_n + .1*loss_euclid_mea_a + loss_a_all
-        #loss_mi = loss_mea_n + loss_mea_a + loss_a_all + .01*loss_euclid_mea_n + .1*loss_euclid_mea_a
-        #loss_mi = loss_euclid_mea_a + loss_euclid_mea_n
-    else:
-        loss_all = loss_ce
-        
-        
-    #loss_all = loss_ce + torch.tensor(alpha).cuda() * loss_mi
-    print(f"loss_all: {loss_all}, loss_ce: {loss_ce}, loss_mea_n: {loss_mea_n}, loss_mea_a: {loss_mea_a}, loss_a_all: {loss_a_all}, euc_n: {loss_euclid_mea_n}, euc_a: {loss_euclid_mea_a}")
-    return loss_all
-
-
-'''
-test04
-
-Baseline: MIAT model attacked with PGD-CE
-Robust Accuracy: 21.83000%
-Test: Average loss: 0.0034, Accuracy: 9997/10000 (100%), Robust Accuracy: 2183/10000 (22%)
-Robust Accuracy: 21.92000%
-Test: Average loss: 0.0034, Accuracy: 9997/10000 (100%), Robust Accuracy: 2192/10000 (22%)
-
-Baseline: STD model attacked with PGD-CE
-Robust Accuracy: 0.07000%
-Test: Average loss: 0.0015, Accuracy: 9998/10000 (100%), Robust Accuracy: 7/10000 (0%)
-Robust Accuracy: 0.06000%
-Test: Average loss: 0.0015, Accuracy: 9998/10000 (100%), Robust Accuracy: 6/10000 (0%)
-
-
-Note here are we using the MIAT for encoder 
-in the PGD and FGSM functions - I used the STD model for model_fn
-It is only used for ground truth - so it's ok.
-
-5 runs whole test dataset
-Robust Accuracy: 21.93000%
-Test: Average loss: 0.0034, Accuracy: 9997/10000 (100%), Robust Accuracy: 2193/10000 (22%)
-Robust Accuracy: 21.90000%
-Test: Average loss: 0.0034, Accuracy: 9997/10000 (100%), Robust Accuracy: 2190/10000 (22%)
-Robust Accuracy: 21.87000%
-Test: Average loss: 0.0034, Accuracy: 9997/10000 (100%), Robust Accuracy: 2187/10000 (22%)
-Robust Accuracy: 22.01000%
-Test: Average loss: 0.0034, Accuracy: 9997/10000 (100%), Robust Accuracy: 2201/10000 (22%)
-Robust Accuracy: 22.02000%
-Test: Average loss: 0.0034, Accuracy: 9997/10000 (100%), Robust Accuracy: 2202/10000 (22%)
-
-For a single batch:
-Robust Accuracy: 23.04688%
-Test: Average loss: 0.0001, Accuracy: 512/10000 (5%), Robust Accuracy: 118/10000 (1%)
-
-Using PGD with eps: 0.15, eps_iter: 0.007, nb_iter: 50
-
-Name of this function is perhaps misleading as it gives TOTAL loss, not just the MI loss.
-This is the first version of MI_loss_testXX that incorporates a euclidean distance metric
-between the MI vectors - I'm not convinced it helps - but it doesn't hurt. See stats above.
-
-:param model_fns: models for calculating loss
-:param alpha: (optional) float. Hyper parameter for tuning the MI portion of loss.
-'''
-
-def MI_loss_test04(model_fns, x_natural, x_adv, y_true, iter=0):
-    #this setting 
-    # typical layout for model_fns
-    #               0        1         2        3         4        5
-    #model_fns = [std_res, miat_res, local_n, global_n, local_a, global_a]
-    target_model = model_fns[1] #target model to calculate loss
-    encoder = model_fns[1] # model to use as encoder
-    local_n = model_fns[2]
-    global_n = model_fns[3]
-    local_a = model_fns[4]
-    global_a = model_fns[5]
-    #all models should already be in eval() mode
-    alpha = 1.
-    lambd = .1
-    #print(f"alpha: {alpha}, lambda: {lambd}")
-    global euc_flag
-
-    logits_adv = target_model(x_adv) # current pred of the model we are attacking
-    loss_ce = F.cross_entropy(logits_adv, y_true)
-
-    #code snippet to select the indices of adv examples that are misclassified and clean samples that
-    # are correctly classified
-    pseudo_label = F.softmax(target_model(x_natural), dim=0).max(1, keepdim=True)[1].squeeze()
-    index = (pseudo_label == y_true)
-    pseudo_label = F.softmax(target_model(x_adv), dim=0).max(1, keepdim=True)[1].squeeze()
-    index = index * (pseudo_label != y_true)
-
-    #init vars for print in case we hit the "else"
-    loss_mea_n = 0
-    loss_mea_a = 0
-    loss_a_all = 0
-    loss_euclid_mea_n = 0
-    loss_euclid_mea_a = 0
-    
-    if torch.nonzero(index).size(0) != 0:
-        loss_n = compute_loss(args=args, former_input=x_natural, latter_input=x_natural, encoder=encoder,
-                dim_local=local_n, dim_global=global_n, v_out=True)* index
-
-        loss_a = compute_loss(args=args, former_input=x_natural, latter_input=x_adv, encoder=encoder,
-                               dim_local=local_n, dim_global=global_n, v_out=True) * index
-
-        loss_euclid_mea_n = torch.sqrt(sum((loss_n - loss_a)**2))
-        
-        loss_a_all = loss_a # for the 3rd term
-        loss_mea_n = torch.abs(torch.tensor(1.0).cuda() - torch.cosine_similarity(loss_n, loss_a, dim=0))
-
-
-        loss_a = compute_loss(args=args, former_input=x_adv - x_natural, latter_input=x_adv, encoder=encoder,
-                              dim_local=local_a, dim_global=global_a, v_out=True) * index
-
-        loss_n = compute_loss(args=args, former_input=x_adv - x_natural, latter_input=x_natural, encoder=encoder,
-                              dim_local=local_a, dim_global=global_a, v_out=True) * index
-
-        loss_euclid_mea_a = torch.sqrt(sum((loss_n - loss_a)**2))
-        
-        # I changed the order of subtraction here to match the paper as far as I can tell eqn 8
-        loss_a_all = loss_a - loss_a_all
-        loss_a_all = loss_a_all.sum()/(torch.nonzero(index).size(0))
-        loss_a_all = torch.abs(torch.tensor(lambd).cuda() * loss_a_all)
-        
-        loss_mea_a = torch.abs(torch.tensor(1.0).cuda() - torch.cosine_similarity(loss_n, loss_a, dim=0))
-
-        #here we do different loss depending on how far along we are.
-        if iter < 5:
-            loss_all = loss_ce
-        elif iter < 25: #add in cosine based MI_loss 
-            loss_all = loss_ce + loss_mea_n + loss_mea_a + loss_a_all
-        else: #switch cosine based for euclidean based MI_loss
-            loss_all = loss_ce + .01*loss_euclid_mea_n + .1*loss_euclid_mea_a + loss_a_all
-        #loss_mi = loss_mea_n + loss_mea_a + loss_a_all + .01*loss_euclid_mea_n + .1*loss_euclid_mea_a
-        #loss_mi = loss_euclid_mea_a + loss_euclid_mea_n
-    else:
-        loss_all = loss_ce
-        
-        
-    #loss_all = loss_ce + torch.tensor(alpha).cuda() * loss_mi
-    print(f"loss_all: {loss_all}, loss_ce: {loss_ce}, loss_mea_n: {loss_mea_n}, loss_mea_a: {loss_mea_a}, loss_a_all: {loss_a_all}, euc_n: {loss_euclid_mea_n}, euc_a: {loss_euclid_mea_a}")
-    return loss_all
-
-
-'''
-test04
-
-Baseline: MIAT model attacked with PGD-CE
-Robust Accuracy: 21.83000%
-Test: Average loss: 0.0034, Accuracy: 9997/10000 (100%), Robust Accuracy: 2183/10000 (22%)
-Robust Accuracy: 21.92000%
-Test: Average loss: 0.0034, Accuracy: 9997/10000 (100%), Robust Accuracy: 2192/10000 (22%)
-
-Baseline: STD model attacked with PGD-CE
-Robust Accuracy: 0.07000%
-Test: Average loss: 0.0015, Accuracy: 9998/10000 (100%), Robust Accuracy: 7/10000 (0%)
-Robust Accuracy: 0.06000%
-Test: Average loss: 0.0015, Accuracy: 9998/10000 (100%), Robust Accuracy: 6/10000 (0%)
-
-
-Note here are we using the MIAT for encoder 
-in the PGD and FGSM functions - I used the STD model for model_fn
-It is only used for ground truth - so it's ok.
-
-5 runs whole test dataset
-Robust Accuracy: 21.93000%
-Test: Average loss: 0.0034, Accuracy: 9997/10000 (100%), Robust Accuracy: 2193/10000 (22%)
-Robust Accuracy: 21.90000%
-Test: Average loss: 0.0034, Accuracy: 9997/10000 (100%), Robust Accuracy: 2190/10000 (22%)
-Robust Accuracy: 21.87000%
-Test: Average loss: 0.0034, Accuracy: 9997/10000 (100%), Robust Accuracy: 2187/10000 (22%)
-Robust Accuracy: 22.01000%
-Test: Average loss: 0.0034, Accuracy: 9997/10000 (100%), Robust Accuracy: 2201/10000 (22%)
-Robust Accuracy: 22.02000%
-Test: Average loss: 0.0034, Accuracy: 9997/10000 (100%), Robust Accuracy: 2202/10000 (22%)
-
-For a single batch:
-Robust Accuracy: 23.04688%
-Test: Average loss: 0.0001, Accuracy: 512/10000 (5%), Robust Accuracy: 118/10000 (1%)
-
-Using PGD with eps: 0.15, eps_iter: 0.007, nb_iter: 50
-
-Name of this function is perhaps misleading as it gives TOTAL loss, not just the MI loss.
-This is the first version of MI_loss_testXX that incorporates a euclidean distance metric
-between the MI vectors - I'm not convinced it helps - but it doesn't hurt. See stats above.
-
-:param model_fns: models for calculating loss
-:param alpha: (optional) float. Hyper parameter for tuning the MI portion of loss.
-'''
-
-
-def MI_loss_test05(model_fns, x_natural, x_adv, y_true, iter=0):
-    #this setting 
-    # typical layout for model_fns
-    #               0        1         2        3         4        5
-    #model_fns = [std_res, miat_res, local_n, global_n, local_a, global_a]
-    target_model = model_fns[0] #target model to calculate loss
-    encoder = model_fns[0] # model to use as encoder
-    local_n = model_fns[2]
-    global_n = model_fns[3]
-    local_a = model_fns[4]
-    global_a = model_fns[5]
-    #all models should already be in eval() mode
-    alpha = 1.
-    lambd = .1
-    #print(f"alpha: {alpha}, lambda: {lambd}")
-    global euc_flag
-
-    logits_adv = target_model(x_adv) # current pred of the model we are attacking
-    loss_ce = F.cross_entropy(logits_adv, y_true)
-
-    #code snippet to select the indices of adv examples that are misclassified and clean samples that
-    # are correctly classified
-    pseudo_label = F.softmax(target_model(x_natural), dim=0).max(1, keepdim=True)[1].squeeze()
-    index = (pseudo_label == y_true)
-    pseudo_label = F.softmax(target_model(x_adv), dim=0).max(1, keepdim=True)[1].squeeze()
-    index = index * (pseudo_label != y_true)
-
-    #init vars for print in case we hit the "else"
-    loss_mea_n = 0
-    loss_mea_a = 0
-    loss_a_all = 0
-    loss_euclid_mea_n = 0
-    loss_euclid_mea_a = 0
-    
-    if torch.nonzero(index).size(0) != 0:
-        loss_n = compute_loss(args=args, former_input=x_natural, latter_input=x_natural, encoder=encoder,
-                dim_local=local_n, dim_global=global_n, v_out=True)* index
-
-        loss_a = compute_loss(args=args, former_input=x_natural, latter_input=x_adv, encoder=encoder,
-                               dim_local=local_n, dim_global=global_n, v_out=True) * index
-
-        loss_euclid_mea_n = torch.sqrt(sum((loss_n - loss_a)**2))
-        
-        loss_a_all = loss_a # for the 3rd term
-        loss_mea_n = torch.abs(torch.tensor(1.0).cuda() - torch.cosine_similarity(loss_n, loss_a, dim=0))
-
-
-        loss_a = compute_loss(args=args, former_input=x_adv - x_natural, latter_input=x_adv, encoder=encoder,
-                              dim_local=local_a, dim_global=global_a, v_out=True) * index
-
-        loss_n = compute_loss(args=args, former_input=x_adv - x_natural, latter_input=x_natural, encoder=encoder,
-                              dim_local=local_a, dim_global=global_a, v_out=True) * index
-
-        loss_euclid_mea_a = torch.sqrt(sum((loss_n - loss_a)**2))
-        
-        # I changed the order of subtraction here to match the paper as far as I can tell eqn 8
-        loss_a_all = loss_a - loss_a_all
-        loss_a_all = loss_a_all.sum()/(torch.nonzero(index).size(0))
-        loss_a_all = torch.abs(torch.tensor(lambd).cuda() * loss_a_all)
-        
-        loss_mea_a = torch.abs(torch.tensor(1.0).cuda() - torch.cosine_similarity(loss_n, loss_a, dim=0))
-
-        #here we do different loss depending on how far along we are.
-        '''
-        if iter < 10:
-            loss_all = loss_ce
-        elif iter < 25: #add in cosine based MI_loss 
-            loss_all = loss_mea_n + loss_mea_a# + loss_a_all
-        else: #switch cosine based for euclidean based MI_loss
-            loss_all = .05*loss_euclid_mea_n + .1*loss_euclid_mea_a# + loss_a_all
-        #loss_mi = loss_mea_n + loss_mea_a + loss_a_all + .01*loss_euclid_mea_n + .1*loss_euclid_mea_a
-        #loss_mi = loss_euclid_mea_a + loss_euclid_mea_n
-        '''
-        beta = 0.5 #0. -> 99.41406%; .5 -> 19.14062% nb_iter = 250;  .75 -> 17.96875%; 1. -> 16.79688%
-        #loss_all = loss_ce + .01*loss_euclid_mea_n + .1*loss_euclid_mea_a #23.82812%
-        #loss_all = loss_ce + loss_a_all + .01*loss_euclid_mea_n + .1*loss_euclid_mea_a #24.80469%
-        #loss_all = loss_ce + loss_a_all + .05*loss_euclid_mea_n + .1*loss_euclid_mea_a #27.92969
-        #loss_all = loss_ce + alpha* (loss_mea_n + loss_mea_a + loss_a_all) + .01*loss_euclid_mea_n + .1*loss_euclid_mea_a # 27.53906%
-        #loss_all = beta * loss_ce + (1-beta) * (alpha* (loss_mea_n + loss_mea_a + loss_a_all) + .01*loss_euclid_mea_n + .1*loss_euclid_mea_a) # Robust Accuracy: 26.75781%
-        loss_all = beta * loss_ce + (1-beta) * (alpha* (loss_mea_n + loss_mea_a + loss_a_all) + .01*loss_euclid_mea_n + .1*loss_euclid_mea_a) # Robust Accuracy: 26.75781%
-    else:
-        loss_all = loss_ce
-        
-        
-    #loss_all = loss_ce + torch.tensor(alpha).cuda() * loss_mi
-    print(f"loss_all: {loss_all}, loss_ce: {loss_ce}, loss_mea_n: {loss_mea_n}, loss_mea_a: {loss_mea_a}, loss_a_all: {loss_a_all}, euc_n: {loss_euclid_mea_n}, euc_a: {loss_euclid_mea_a}")
-    return loss_all
-
-
-'''
 Name of this function is perhaps misleading as it gives TOTAL loss, not just the MI loss.
 :param model
 :param alpha: (optional) float. Hyper parameter for tuning the MI portion of loss.
 '''
-def MI_loss(models, x_natural, y, y_true ,x_adv, local_n, global_n, local_a, global_a, alpha=5.0, lambd=0.1, iter=0):
-    model = models[0] #changed to eval not train()
-    model.eval()
-    model2 = models[1]
-    local_n.eval()
-    global_n.eval()
-    local_a.eval()
-    global_a.eval()
+#               0        1         2        3         4        5
+#model_fns = [std_res, miat_res, local_n, global_n, local_a, global_a]
+def MI_loss(model_fns, x_natural, y_true ,x_adv, alpha=5.0, lambd=0.1, iter=0):
+    model = model_fns[1] #[0] is std
+    
+    local_n = model_fns[2]
+    global_n = model_fns[3]
+    local_a = model_fns[4]
+    global_a = model_fns[5]
 
-    #if y_true is None:
-    #    y_true = y
-
-    # logits_nat = model(x_natural)
     logits_adv = model(x_adv)
-
-    #loss_ce = F.cross_entropy(F.softmax(logits_adv, dim=1), y)#, reduction='mean')
-    loss_ce = F.cross_entropy(logits_adv, y)#, reduction='mean')
-    # loss_ce = 0.2 * F.cross_entropy(logits_nat, y) + 0.8 * F.cross_entropy(logits_adv, y)
-
+    
+    loss_ce = F.cross_entropy(logits_adv, y_true)#, reduction='mean')
+    
     # I believe this little block of code is looking for the indices of the samples that are misclassified
     pseudo_label = F.softmax(model(x_natural), dim=0).max(1, keepdim=True)[1].squeeze()
-    #print(f"pseudo_label: {pseudo_label}")
     index = (pseudo_label == y_true)
     pseudo_label = F.softmax(model(x_adv), dim=0).max(1, keepdim=True)[1].squeeze()
     index = index * (pseudo_label != y_true)
-    #print(f"index: {index}")
-
-    #if torch.nonzero(index).size(0) != 0:
     
-    if True:
-        
+    loss_mea_n = 0
+    loss_mea_a = 0
+    loss_a_all = 0 
+    
+    if torch.nonzero(index).size(0) != 0:
         #see equation 8, 9 - it looks like in the actual code implmentation they leave off the lambda term E_a(h(x)) - E_n(h(x))
         loss_n = compute_loss(args=args, former_input=x_natural, latter_input=x_natural, encoder=model,
-                dim_local=local_n, dim_global=global_n, v_out=True)#* index
+                dim_local=local_n, dim_global=global_n, v_out=True) * index
 
         loss_a = compute_loss(args=args, former_input=x_natural, latter_input=x_adv, encoder=model,
-                               dim_local=local_n, dim_global=global_n, v_out=True)# * index
+                               dim_local=local_n, dim_global=global_n, v_out=True) * index
 
         loss_a_all = loss_a # added this back in it was commented out
         loss_mea_n = torch.abs(torch.tensor(1.0).cuda() - torch.cosine_similarity(loss_n, loss_a, dim=0))
 
 
         loss_a = compute_loss(args=args, former_input=x_adv - x_natural, latter_input=x_adv, encoder=model,
-                              dim_local=local_a, dim_global=global_a, v_out=True) #* index
+                              dim_local=local_a, dim_global=global_a, v_out=True) * index
 
         loss_n = compute_loss(args=args, former_input=x_adv - x_natural, latter_input=x_natural, encoder=model,
-                              dim_local=local_a, dim_global=global_a, v_out=True) #* index
+                              dim_local=local_a, dim_global=global_a, v_out=True) * index
 
-        #loss_a_all = torch.tensor(0.1).cuda() * (loss_a_all - loss_a) #added back in - it was commented out
         lambd = .1
         alpha = 5.
-        loss_a_all = torch.tensor(lambd).cuda() * torch.max((loss_a_all - loss_a)) #see line above, this is 3rd term but we take the MAX from the output
-        #loss_a_all = torch.tensor(lambd).cuda() * torch.mean((loss_a_all - loss_a)) 
+        loss_a_all = (loss_a_all - loss_a)
+        loss_a_all = loss_a_all.sum()/(torch.nonzero(index).size(0)) #so this is an avg
+        loss_a_all = torch.abs(torch.tensor(.1).cuda() * loss_a_all)
+        #loss_a_all = torch.tensor(lambd).cuda() * torch.max((loss_a_all - loss_a)) #see line above, this is 3rd term but we take the MAX from the output
+        
         loss_mea_a = torch.abs(torch.tensor(1.0).cuda() - torch.cosine_similarity(loss_n, loss_a, dim=0))
-
-        #loss_mi = 100. * loss_mea_n + 10. * loss_mea_a  #+ loss_a_all 
-        #loss_mi = loss_mea_n + loss_mea_a + loss_a_all
-        loss_mi = loss_mea_a #+ loss_mea_n#+ loss_a_all
-        #loss_mi = loss_a_all
-        #loss_all = alpha * (loss_mi + loss_a_all)
+        loss_mi = loss_mea_a + loss_mea_n + loss_a_all
         
-        beta = .5
-        if loss_mi < 1e-8:
-            loss_all = loss_ce
-        elif iter < 10:
-            loss_all = loss_ce
-        else:
-            loss_all = loss_mi
-        print(f"iter: {iter}, loss_ce: {loss_ce}, loss_mea_n: {loss_mea_n}, loss_mea_a: {loss_mea_a}, loss_a_all: {loss_a_all}, loss_all: {loss_all}")
-        
-        loss_all = alpha * loss_mi + loss_ce
+        loss_all = loss_ce + alpha * loss_mi
     else:
-        #print("we're in the else where loss_mi is set to 0!")
-        loss_mi = 0.0
         loss_all = loss_ce
-        #print(f"loss_all=loss_ce={loss_all}")
         
+    print(f"iter: {iter}, loss_all: {loss_all}, loss_ce: {loss_ce}, loss_mea_n: {loss_mea_n}, loss_mea_a: {loss_mea_a}, loss_a_all: {loss_a_all}")
     # default is alpha = 5
     #loss_all = loss_ce + alpha * loss_mi # original line
     #loss_all = alpha * loss_mi
-    loss_all = loss_ce
+    
     return loss_all
 
 
@@ -731,6 +172,7 @@ def fast_gradient_method(
     sanity_checks=False,
     alpha=5.,
     iter=0,
+    loss_fn=None,
 ):
     """
     PyTorch implementation of the Fast Gradient Method.
@@ -746,7 +188,7 @@ def fast_gradient_method(
               labels when crafting adversarial samples. Otherwise, model predictions are used
               as labels to avoid the "label leaking" effect (explained in this paper:
               https://arxiv.org/abs/1611.01236). Default is None.
-    :param y_true: Passed alont to LOSS_MI
+    :param y_true: Passed along to LOSS_MI
     :param targeted: (optional) bool. Is the attack targeted or untargeted?
               Untargeted, the default, will try to make the label incorrect.
               Targeted will instead try to move in the direction of being more like y.
@@ -754,6 +196,7 @@ def fast_gradient_method(
               memory or for unit tests that intentionally pass strange input)
     :param alpha: (optional) float. Hyper parameter for tuning the MI portion of loss.
     :param iter: (optional) int. Current iteration number for PGD.
+    :param loss_fn: (optional) the loss function to use. Default will be cross-entropy.
     :return: a tensor for the adversarial example
     """
     if norm not in [np.inf, 1, 2]:
@@ -764,8 +207,8 @@ def fast_gradient_method(
         raise ValueError(
             "eps must be greater than or equal to 0, got {} instead".format(eps)
         )
-
-    model_fn = model_fns[0] #[1] is miat - should have used a dictionary with a named key - this is python after all.
+    
+    model_fn = model_fns[1] #[1] is miat [0] is std
     
     if eps == 0:
         return x
@@ -803,7 +246,7 @@ def fast_gradient_method(
     #loss_fn = torch.nn.CrossEntropyLoss()
     #loss = loss_fn(model_fn(x), y)
     #print(f"loss_ce: {loss}")
-    loss = MI_loss_test05(model_fns, x_natural=x_natural, x_adv=x, y_true=y_true,iter=iter)
+    loss = loss_fn(model_fns, x_natural=x_natural, x_adv=x, y_true=y_true,iter=iter)
     # If attack is targeted, minimize loss of target label rather than maximize loss of correct label
     if targeted:
         loss = -loss
@@ -848,6 +291,7 @@ def pgd(
     rand_init=True,
     rand_minmax=None,
     sanity_checks=True,
+    loss_fn=None,
 ):
     """
     This class implements either the Basic Iterative Method
@@ -883,7 +327,7 @@ def pgd(
     """
     #model_fns[0] is the target model
     #model_fns[1] is the model to construct adv samples with with (same as model_fns[0] for white-box attack)
-    model_fn = model_fns[0] #should have used a named key in a dictionary for this = back to miat.
+    model_fn = model_fns[1] # 1 is MIAT
     if norm == 1:
         raise NotImplementedError(
             "It's not clear that FGM is a good inner loop"
@@ -965,7 +409,8 @@ def pgd(
             y=y,
             y_true=y_true,
             targeted=targeted,
-            iter=i
+            iter=i,
+            loss_fn=loss_fn,
         )
 
         # Clipping perturbation eta to norm norm ball #schwab: eta is the perturbation. Need to clip to Norm ball.
@@ -990,22 +435,17 @@ def pgd(
     return adv_x
 
 #               0        1         2        3         4        5
-#model_fns = [std_res, miat_res, local_n, global_n, local_a, global_a]
-def eval_loss(model_fns, device, test_loader):
-    std_res_fn = model_fns[0]
-    miat_res_fn = model_fns[1]
-    local_n = model_fns[2]
-    global_n = model_fns[3]
-    local_a = model_fns[4]
-    global_a = model_fns[5]
-
+#model_fns = [std_res, miat_res, local_n, global_n, local_a, global_a] #now a dictionary but indexing should work.
+def eval_loss(model_fns, device, test_loader, loss_fn):
+    target_model_fn = model_fns[1]
+    
     loss = []
     acc = []
     acc_adv = []
 
     #this is our L_infty constraint - added 1.5+ 
-    #eps_lst = [.025, .05, .075, .1, .125, .15, .175, .2, .25, .3, .4, .5, .75, 1.] #, 1.5, 2., 2.5] #stopping at 1
-    eps_lst = [.025, .05, .075, .1]
+    eps_lst = [.025, .05, .075, .1, .125, .15, .175, .2, .25, .3, .4, .5, .75, 1.] #, 1.5, 2., 2.5] #stopping at 1
+    #eps_lst = [.025, .05, .075, .1]
 
     for eps in eps_lst:
         #eps = .025
@@ -1016,8 +456,8 @@ def eval_loss(model_fns, device, test_loader):
 
         eps_iter = .007
         #eps_iter = .005
-        nb_iter = round(eps/eps_iter) + 10
-        #nb_iter = 40 
+        #nb_iter = round(eps/eps_iter) + 10
+        nb_iter = 100
         print(f"Using PGD with eps: {eps}, eps_iter: {eps_iter}, nb_iter: {nb_iter}")
         #with torch.no_grad():
         i = 0
@@ -1026,14 +466,14 @@ def eval_loss(model_fns, device, test_loader):
             print(f"batch number {i}, {i*args.batch_size} / {len(test_loader.dataset)}")
             x_natural, y_true = x_natural.to(device), y_true.to(device)
             
-            x_adv = pgd(model_fns, x_natural, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=None, y_true=y_true, targeted=False)
+            x_adv = pgd(model_fns, x_natural, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=None, y_true=y_true, targeted=False, rand_init=False, loss_fn=loss_fn)
             
             #x_adv = data_adv.detach().cpu().numpy().transpose(0,2,3,1) #I'll use this later - gonna paste all the images together.
             #y_nat_pred = miat_res_fn(x_natural)
             #y_adv_pred = miat_res_fn(x_adv)
             #next two lines are in case you want to eval the standard resnet
-            y_nat_pred = std_res_fn(x_natural)
-            y_adv_pred = std_res_fn(x_adv)
+            y_nat_pred = target_model_fn(x_natural)
+            y_adv_pred = target_model_fn(x_adv)
             
             
             test_loss += F.cross_entropy(y_nat_pred, y_true, reduction='sum').item()
@@ -1042,7 +482,7 @@ def eval_loss(model_fns, device, test_loader):
             correct += pred.eq(y_true.view_as(pred)).sum().item()
             correct_adv += pred_adv.eq(y_true.view_as(pred_adv)).sum().item()
             #if i==1:
-            #     break
+            #    break
             
         l = i*args.batch_size 
         if l > len(test_loader.dataset):
@@ -1101,11 +541,11 @@ def main():
     global_a = MI1x1ConvNet(z_size, args.va_hsize)
 
     std_res_name = 'resnet-new-100' 
-    miat_res_name = 'resnet-new-100-MIAT-from-scratch'
-    l_n = 'local_n.5'
-    g_n = 'global_n.5'
-    l_a = 'local_a.5'
-    g_a = 'global_a.5'
+    miat_res_name = 'resnet-new-100-MIAT-0.25-from-scratch'
+    l_n = 'local_n.25'
+    g_n = 'global_n.25'
+    l_a = 'local_a.25'
+    g_a = 'global_a.25'
 
     std_res.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, std_res_name)))
     miat_res.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, miat_res_name)))
@@ -1138,7 +578,20 @@ def main():
     print(f"Evaluating Loss Functions...")
     #               0        1         2        3         4        5
     model_fns = [std_res, miat_res, local_n, global_n, local_a, global_a]
-    eval_loss(model_fns, device, test_loader)
+    #model_fns = {'std': std_res, 'miat': miat_res, 'local_n':local_n, 'global_n': global_n, 'local_a': local_a, 'global_a': global_a}
+    loss_fn = MI_loss
+
+    loss, acc, acc_adv = eval_loss(model_fns, device, test_loader, loss_fn)
+
+    ## TEST THIS BEFORE RUNNING THE WHOLE THING
+    
+    print("Clean Accuracy:")
+    for x in acc:
+        print(x)
+    print("Adversarial Accuracy:")
+    for x in acc_adv:
+        print(x)
+    
 
 if __name__ == '__main__':
     main()
