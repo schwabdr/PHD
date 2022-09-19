@@ -82,7 +82,133 @@ Uses the same MI_loss that is used for MIAT/NAMID training (CE+3MI-Terms)
 '''
 
 '''
+MI_loss2 - 
+This was done as a tuning for the MI-Craft Method.
+1) calculate the MI based loss terms for ALL images, not just the misclassified ones.
+2) add 'alpha' parameters to remove pieces as we go along
+3) 
+
+
+Following settings on single batch achieved 31.83594% robust accuracy at eps = 0.1
+#default lambdas for now - use cosine loss only
+        l1 = 1
+        l2 = 1
+        l3 = 0
+        l4 = 0
+        l5 = 0
+        #if above threshold - switch to Euclidean loss
+        if loss_mea_n > 1.5:
+            l1 = 0
+            l3 = .01
+        if loss_mea_a > 1.5:
+            l2 = 0
+            l4 = .1
+        beta = .5
+        loss_all = beta * loss_ce + (1-beta) * 5.0 * (l1*loss_mea_n + l2*loss_mea_a + l3*loss_euclid_mea_n + l4*loss_euclid_mea_a + l5*loss_a_all)
+
+But the Euclidean loss was never used - the cosine loss never got high enough.
+
+Name of this function is perhaps misleading as it gives TOTAL loss, not just the MI loss.
+:param model
+:param alpha: (optional) float. Hyper parameter for tuning the MI portion of loss.
+'''
+#               0        1         2        3         4        5
+#model_fns = [std_res, miat_res, local_n, global_n, local_a, global_a]
+def MI_loss2(model_fns, x_natural, y_true ,x_adv, alpha=5.0, lambd=0.1, iter=0):
+    model = model_fns[0] #[0] is std
+    encoder = model_fns[0]
+    local_n = model_fns[2]
+    global_n = model_fns[3]
+    local_a = model_fns[4]
+    global_a = model_fns[5]
+
+    logits_adv = model(x_adv)
+    
+    loss_ce = F.cross_entropy(logits_adv, y_true)#, reduction='mean')
+    
+    # I believe this little block of code is looking for the indices of the samples that are misclassified
+    pseudo_label = F.softmax(model(x_natural), dim=0).max(1, keepdim=True)[1].squeeze()
+    index = (pseudo_label == y_true)
+    pseudo_label = F.softmax(model(x_adv), dim=0).max(1, keepdim=True)[1].squeeze()
+    index = index * (pseudo_label != y_true)
+    
+    #init vars 
+    loss_mea_n = 0  #lambda1
+    loss_mea_a = 0 #lambda2
+    loss_euclid_mea_n = 0 #lambda3 default .01
+    loss_euclid_mea_a = 0 #lambda4 default .1
+    loss_a_all = 0 #lambda5 default 1
+    
+    
+    
+    if torch.nonzero(index).size(0) != 0:
+        #see equation 8, 9 - it looks like in the actual code implmentation they leave off the lambda term E_a(h(x)) - E_n(h(x))
+        loss_n = compute_loss(args=args, former_input=x_natural, latter_input=x_natural, encoder=encoder,
+                dim_local=local_n, dim_global=global_n, v_out=True) * index
+        loss_a = compute_loss(args=args, former_input=x_natural, latter_input=x_adv, encoder=encoder,
+                               dim_local=local_n, dim_global=global_n, v_out=True) * index
+        
+        loss_euclid_mea_n = torch.sqrt(sum((loss_n - loss_a)**2))
+
+        loss_a_all = loss_a # added this back in it was commented out
+        loss_mea_n = torch.abs(torch.tensor(1.0).cuda() - torch.cosine_similarity(loss_n, loss_a, dim=0))
+
+        loss_a = compute_loss(args=args, former_input=x_adv - x_natural, latter_input=x_adv, encoder=encoder,
+                              dim_local=local_a, dim_global=global_a, v_out=True) * index
+        loss_n = compute_loss(args=args, former_input=x_adv - x_natural, latter_input=x_natural, encoder=encoder,
+                              dim_local=local_a, dim_global=global_a, v_out=True) * index
+        
+        loss_euclid_mea_a = torch.sqrt(sum((loss_n - loss_a)**2))
+
+        alpha = 5.
+        loss_a_all = (loss_a - loss_a_all)
+        loss_a_all = loss_a_all.sum()/(torch.nonzero(index).size(0)) #so this is an avg
+        #loss_a_all = torch.abs(torch.tensor(.1).cuda() * loss_a_all)
+        loss_a_all = torch.abs(loss_a_all)
+        
+        loss_mea_a = torch.abs(torch.tensor(1.0).cuda() - torch.cosine_similarity(loss_n, loss_a, dim=0))
+        
+        #lambdas
+        l1 = 1
+        l2 = 1
+        l3 = .01
+        l4 = .1
+        l5 = .1
+
+        #if iter < 10:
+        #    loss_all = loss_ce
+        #elif iter < 25: #add in cosine based MI_loss 
+        loss_all =  loss_ce + 5 * (loss_mea_n + loss_mea_a + .1 * loss_a_all) + l3 * loss_euclid_mea_n + l4 * loss_euclid_mea_a
+        #else: #switch cosine based for euclidean based MI_loss
+        #    loss_all = loss_ce +  (.01*loss_euclid_mea_n + .1*loss_euclid_mea_a + .1 * loss_a_all)
+
+        '''
+        #if above threshold - switch to Euclidean loss
+        if loss_mea_n > 1.5:
+            l1 = 0
+            l3 = .01
+        if loss_mea_a > 1.5:
+            l2 = 0
+            l4 = .1
+        
+        beta = .5
+
+        loss_all = beta * loss_ce + (1-beta) * 5.0 * (l1*loss_mea_n + l2*loss_mea_a + l3*loss_euclid_mea_n + l4*loss_euclid_mea_a + l5*loss_a_all)
+        #loss_all = 5.0 * (l1*loss_mea_n + l2*loss_mea_a + l3*loss_euclid_mea_n + l4*loss_euclid_mea_a + l5*loss_a_all)
+        '''
+    else:
+        loss_all = loss_ce
+        
+    print(f"iter: {iter}, loss_all: {loss_all}, loss_ce: {loss_ce}, loss_mea_n: {loss_mea_n}, loss_mea_a: {loss_mea_a}, euc_n: {loss_euclid_mea_n}, euc_a: {loss_euclid_mea_a}, loss_a_all: {loss_a_all}")
+    
+    return loss_all
+
+
+
+
+'''
 MI_loss - use original MIAT training
+This was done as a baseline for the MI-Craft Method.
 
 Name of this function is perhaps misleading as it gives TOTAL loss, not just the MI loss.
 :param model
@@ -111,6 +237,7 @@ def MI_loss(model_fns, x_natural, y_true ,x_adv, alpha=5.0, lambd=0.1, iter=0):
     loss_mea_n = 0
     loss_mea_a = 0
     loss_a_all = 0 
+    
     
     if torch.nonzero(index).size(0) != 0:
         #see equation 8, 9 - it looks like in the actual code implmentation they leave off the lambda term E_a(h(x)) - E_n(h(x))
@@ -145,9 +272,6 @@ def MI_loss(model_fns, x_natural, y_true ,x_adv, alpha=5.0, lambd=0.1, iter=0):
         loss_all = loss_ce
         
     print(f"iter: {iter}, loss_all: {loss_all}, loss_ce: {loss_ce}, loss_mea_n: {loss_mea_n}, loss_mea_a: {loss_mea_a}, loss_a_all: {loss_a_all}")
-    # default is alpha = 5
-    #loss_all = loss_ce + alpha * loss_mi # original line
-    #loss_all = alpha * loss_mi
     
     return loss_all
 
@@ -437,15 +561,15 @@ def pgd(
 #               0        1         2        3         4        5
 #model_fns = [std_res, miat_res, local_n, global_n, local_a, global_a] #now a dictionary but indexing should work.
 def eval_loss(model_fns, device, test_loader, loss_fn):
-    target_model_fn = model_fns[1]
+    target_model_fn = model_fns[0]
     
     loss = []
     acc = []
     acc_adv = []
 
-    #this is our L_infty constraint - added 1.5+ 
-    eps_lst = [.025, .05, .075, .1, .125, .15, .175, .2, .25, .3, .4, .5, .75, 1.] #, 1.5, 2., 2.5] #stopping at 1
+    eps_lst = [.025, .05, .075, .1, .125, .15, .175, .2, .25, .3, .4, .5, .75, 1.]
     #eps_lst = [.025, .05, .075, .1]
+    #eps_lst = [.1]
 
     for eps in eps_lst:
         #eps = .025
@@ -466,7 +590,7 @@ def eval_loss(model_fns, device, test_loader, loss_fn):
             print(f"batch number {i}, {i*args.batch_size} / {len(test_loader.dataset)}")
             x_natural, y_true = x_natural.to(device), y_true.to(device)
             
-            x_adv = pgd(model_fns, x_natural, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=None, y_true=y_true, targeted=False, rand_init=False, loss_fn=loss_fn)
+            x_adv = pgd(model_fns, x_natural, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=None, y_true=y_true, targeted=False, rand_init=True, loss_fn=loss_fn)
             
             #x_adv = data_adv.detach().cpu().numpy().transpose(0,2,3,1) #I'll use this later - gonna paste all the images together.
             #y_nat_pred = miat_res_fn(x_natural)
@@ -542,6 +666,7 @@ def main():
 
     std_res_name = 'resnet-new-100' 
     miat_res_name = 'resnet-new-100-MIAT-0.25-from-scratch'
+    #miat_res_name = 'resnet-new-100-MIAT-from-scratch'
     l_n = 'local_n.25'
     g_n = 'global_n.25'
     l_a = 'local_a.25'
@@ -579,7 +704,7 @@ def main():
     #               0        1         2        3         4        5
     model_fns = [std_res, miat_res, local_n, global_n, local_a, global_a]
     #model_fns = {'std': std_res, 'miat': miat_res, 'local_n':local_n, 'global_n': global_n, 'local_a': local_a, 'global_a': global_a}
-    loss_fn = MI_loss
+    loss_fn = MI_loss2
 
     loss, acc, acc_adv = eval_loss(model_fns, device, test_loader, loss_fn)
 
