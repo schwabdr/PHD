@@ -332,7 +332,7 @@ def fast_gradient_method(
             "eps must be greater than or equal to 0, got {} instead".format(eps)
         )
     
-    model_fn = model_fns[1] #[1] is miat [0] is std
+    model_fn = model_fns[0] #[1] is miat [0] is std
     
     if eps == 0:
         return x
@@ -451,7 +451,7 @@ def pgd(
     """
     #model_fns[0] is the target model
     #model_fns[1] is the model to construct adv samples with with (same as model_fns[0] for white-box attack)
-    model_fn = model_fns[1] # 1 is MIAT
+    model_fn = model_fns[0] # 0 is STD, 1 is MIAT
     if norm == 1:
         raise NotImplementedError(
             "It's not clear that FGM is a good inner loop"
@@ -667,10 +667,10 @@ def main():
     std_res_name = 'resnet-new-100' 
     miat_res_name = 'resnet-new-100-MIAT-0.25-from-scratch'
     #miat_res_name = 'resnet-new-100-MIAT-from-scratch'
-    l_n = 'local_n.25'
-    g_n = 'global_n.25'
-    l_a = 'local_a.25'
-    g_a = 'global_a.25'
+    l_n = 'local_n'
+    g_n = 'global_n'
+    l_a = 'local_a'
+    g_a = 'global_a'
 
     std_res.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, std_res_name)))
     miat_res.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, miat_res_name)))
