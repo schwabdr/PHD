@@ -8,14 +8,14 @@ import os
 import numpy as np
 import torch
 
-import tkinter
+#import tkinter
 import matplotlib
-matplotlib.use('tkagg') #need this line for Lambda
+#matplotlib.use('tkagg') #need this line for Lambda
 #from Epyc
 #['GTK3Agg', 'GTK3Cairo', 'GTK4Agg', 'GTK4Cairo', 'MacOSX', 'nbAgg', 'QtAgg', 'QtCairo', 'Qt5Agg', 'Qt5Cairo', 'TkAgg', 'TkCairo', 'WebAgg', 'WX', 'WXAgg', 'WXCairo', 'agg', 'cairo', 'pdf', 'pgf', 'ps', 'svg', 'template']
 
 #matplotlib.use('webagg')
-#matplotlib.use('agg')
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
 from utils import config

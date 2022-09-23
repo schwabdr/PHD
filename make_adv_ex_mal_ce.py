@@ -20,21 +20,27 @@ from utils import config
 from utils import data 
 
 import matplotlib
-matplotlib.use('tkagg')
+matplotlib.use('agg') #tkagg for Lambda - agg on epyc can only save imgs to disk
 import matplotlib.pyplot as plt
 
 c = config.Configuration()
 args = c.getArgs()
-stats = c.getNormStats()
+#normalization stats - calculated for MalImg
+#mean: tensor([0.4454, 0.4454, 0.4454])
+#std: tensor([0.3122, 0.3122, 0.3122])
 
-args.batch_size = 2048 #can probably almost double this number - only using about 6811 MiB / 11019 MiB
+stats = ((0.4454, 0.4454, 0.4454), (0.3122, 0.3122, 0.3122)) #mean and stdev
 
-classes = ['plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+args.batch_size = 128
 
-def show_grid(x, y):
+classes = ['Adialer.C', 'Agent.FYI', 'Allaple.A', 'Allaple.L', 'Alueron.gen!J', 'Autorun.K', 'C2LOP.P', 'C2LOP.gen!g', 'Dialplatform.B', 'Dontovo.A', 'Fakerean', 
+                'Instantaccess', 'Lolyda.AA1', 'Lolyda.AA2', 'Lolyda.AA3', 'Lolyda.AT', 'Malex.gen!J', 'Obfuscator.AD', 'Rbot!gen', 'Skintrim.N', 'Swizzor.gen!E', 'Swizzor.gen!I', 
+                'VB.AT', 'Wintrim.BX', 'Yuner.A']
+
+def show_grid(x, y, name):
     rows = 5
     cols = 5
-    fig,axes1 = plt.subplots(rows,cols,figsize=(5,5))
+    fig,axes1 = plt.subplots(rows,cols,figsize=(10,10))
         
     lst = list(range(0, len(x)))
     random.shuffle(lst)
@@ -51,7 +57,8 @@ def show_grid(x, y):
             #axes1[j][k+1].imshow(x_adv[i], interpolation='nearest')
             #pred_ind = pred_adv[i]
             #axes1[j][k+1].text(0,0,classes[pred_ind])
-    plt.show()    
+    plt.show()
+    plt.savefig(name, format='png')    
 
 def open_adv_examples():
     print(f"Opening adv examples and printing random")
@@ -70,8 +77,8 @@ def open_adv_examples():
     # min: -1.9259666204452515
     # max: 2.130864143371582
 
-    trainset = data.data_dataset(img_path=args.adv_img_train, clean_label_path=args.adv_label_train, transform=trans_train)
-    testset = data.data_dataset(img_path=args.adv_img_test, clean_label_path=args.adv_label_test, transform=trans_test)
+    trainset = data.data_dataset(img_path=args.adv_img_train_mal, clean_label_path=args.adv_label_train_mal, transform=trans_train)
+    testset = data.data_dataset(img_path=args.adv_img_test_mal, clean_label_path=args.adv_label_test_mal, transform=trans_test)
     
     #create data loaders
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, drop_last=False,
@@ -86,7 +93,7 @@ def open_adv_examples():
         x = (x*255).astype(int)
         if first:
             first = False
-            show_grid(x, y)
+            show_grid(x, y, "./imgs/train_imgs_mal_adv.png")
     
     first = True
     for dat, label in test_loader:
@@ -96,15 +103,15 @@ def open_adv_examples():
         x = (x*255).astype(int)
         if first:
             first = False
-            show_grid(x, y)
+            show_grid(x, y, "./imgs/test_imgs_mal_adv.png")
     
 
 
 
 def make_examples(model, device, train_loader, test_loader):
-    eps = 8/255. #original value approx .03
+    #eps = 8/255. #original value approx .03
     #eps = .1 #for the named ".1" dataset and estimators
-    #eps = .25 # will name it .25 dataset and estimators
+    eps = .25 # will name it .25 dataset and estimators
     #eps = .5 # will name it .5 dataset and estimators
     
     eps_iter = .007
@@ -189,12 +196,12 @@ def make_examples(model, device, train_loader, test_loader):
     
 
 def main():
-    print(f"hello MIAT - we are creating adversarial example data on disk as np arrays")
+    print(f"hello MIAT - we are creating adversarial example data from MalImg on disk as np arrays")
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     
-    name = 'resnet-new-100' #input("Name of model to load: ") #for now I'll hard code the only model I have trained
-    model = ResNet18(10)
+    name = 'resnet-mal-std' #input("Name of model to load: ") #for now I'll hard code the only model I have trained
+    model = ResNet18(25)
     path = str(os.path.join(args.SAVE_MODEL_PATH, name))
 
     model.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, name)))
@@ -209,21 +216,16 @@ def main():
         #transforms.RandomCrop(32, padding=4, padding_mode='reflect'),
         #transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        transforms.Normalize(*stats, inplace=False) #original code was True here from MIAT - not sure why, just making a note
+        transforms.Normalize(*stats, inplace=True) #original code was True here from MIAT - not sure why, just making a note
     ])
 
     trans_test = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize(*stats)
+        transforms.Normalize(*stats, inplace=True)
     ])
-    #now I need to pull in the data and create the dataloaders
-    # this link states that we do indeed move the data out of the range [0,1] - so I guess this is correct.
-    # https://www.kaggle.com/code/fanbyprinciple/cifar10-explanation-with-pytorch
-    # min: -1.9259666204452515
-    # max: 2.130864143371582
-
-    trainset = data.data_dataset(img_path=args.nat_img_train, clean_label_path=args.nat_label_train, transform=trans_train)
-    testset = data.data_dataset(img_path=args.nat_img_test, clean_label_path=args.nat_label_test, transform=trans_test)
+    
+    trainset = data.data_dataset(img_path=args.nat_img_train_mal, clean_label_path=args.nat_label_train_mal, transform=trans_train)
+    testset = data.data_dataset(img_path=args.nat_img_test_mal, clean_label_path=args.nat_label_test_mal, transform=trans_test)
 
     #create data loaders
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, drop_last=False,
