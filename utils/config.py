@@ -20,6 +20,16 @@ class Configuration:
         self.parser.add_argument('--adv-img-test', type=str, help='adv test data', default='./data/adv_test_images.25.npy')
         self.parser.add_argument('--adv-label-test', type=str, help='adv test label', default='./data/adv_test_labels.25.npy')
         
+        self.parser.add_argument('--nat-img-train-mal', type=str, help='natural training mal data', default='./data/train_images_mal.npy')
+        self.parser.add_argument('--nat-label-train-mal', type=str, help='natural training mal label', default='./data/train_labels_mal.npy')
+        self.parser.add_argument('--nat-img-test-mal', type=str, help='natural test mal data', default='./data/test_images_mal.npy')
+        self.parser.add_argument('--nat-label-test-mal', type=str, help='natural test mal label', default='./data/test_labels_mal.npy')
+
+        self.parser.add_argument('--adv-img-train-mal', type=str, help='adv train data', default='./data/adv_train_images_mal.03.npy')
+        self.parser.add_argument('--adv-label-train-mal', type=str, help='adv train label', default='./data/adv_train_labels_mal.03.npy')
+        self.parser.add_argument('--adv-img-test-mal', type=str, help='adv test data', default='./data/adv_test_images_mal.03.npy')
+        self.parser.add_argument('--adv-label-test-mal', type=str, help='adv test label', default='./data/adv_test_labels_mal.03.npy')
+        
         self.parser.add_argument('--SAVE-MODEL-PATH', type=str, help='path to save trained models to', default='./models/saved/')
 
         self.parser.add_argument('--batch-size', type=int, default=256, metavar='N', help='input batch size for training (default: 128)')

@@ -1,0 +1,208 @@
+Preparing to train a ResNet18 Model on MalImg dataset ...
+================================================================
+cuda devices: 1
+Device 0: NVIDIA A100 80GB PCIe: Capability: (8, 0)
+================================================================
+device: cuda
+len(full_dataset): 9339
+Train Epoch: 1 [128/8405 (2%)]	Loss: 3.221824
+Train Epoch: 1 [6528/8405 (77%)]	Loss: 1.522584
+================================================================
+Train: Average loss: 0.9781, Accuracy: 6082/8405 (72%)
+Test: Average loss: 0.9697, Accuracy: 670/934 (72%)
+================================================================
+Saving resnet model 'resnet-mal-std1' ...
+Save Complete. Next Epoch ...
+Train Epoch: 2 [128/8405 (2%)]	Loss: 0.853505
+Train Epoch: 2 [6528/8405 (77%)]	Loss: 0.309733
+================================================================
+Train: Average loss: 0.3842, Accuracy: 7348/8405 (87%)
+Test: Average loss: 0.3820, Accuracy: 811/934 (87%)
+================================================================
+Saving resnet model 'resnet-mal-std2' ...
+Save Complete. Next Epoch ...
+Train Epoch: 3 [128/8405 (2%)]	Loss: 0.434220
+Train Epoch: 3 [6528/8405 (77%)]	Loss: 0.232401
+================================================================
+Train: Average loss: 0.2047, Accuracy: 7943/8405 (95%)
+Test: Average loss: 0.2057, Accuracy: 877/934 (94%)
+================================================================
+Saving resnet model 'resnet-mal-std3' ...
+Save Complete. Next Epoch ...
+Train Epoch: 4 [128/8405 (2%)]	Loss: 0.215309
+Train Epoch: 4 [6528/8405 (77%)]	Loss: 0.133996
+================================================================
+Train: Average loss: 0.1872, Accuracy: 7934/8405 (94%)
+Test: Average loss: 0.1891, Accuracy: 877/934 (94%)
+================================================================
+Saving resnet model 'resnet-mal-std4' ...
+Save Complete. Next Epoch ...
+Train Epoch: 5 [128/8405 (2%)]	Loss: 0.159062
+Train Epoch: 5 [6528/8405 (77%)]	Loss: 0.360616
+================================================================
+Train: Average loss: 0.1568, Accuracy: 7993/8405 (95%)
+Test: Average loss: 0.1626, Accuracy: 885/934 (95%)
+================================================================
+Saving resnet model 'resnet-mal-std5' ...
+Save Complete. Next Epoch ...
+Train Epoch: 6 [128/8405 (2%)]	Loss: 0.353462
+Train Epoch: 6 [6528/8405 (77%)]	Loss: 0.158992
+================================================================
+Train: Average loss: 0.1920, Accuracy: 7940/8405 (94%)
+Test: Average loss: 0.2078, Accuracy: 876/934 (94%)
+================================================================
+Saving resnet model 'resnet-mal-std6' ...
+Save Complete. Next Epoch ...
+Train Epoch: 7 [128/8405 (2%)]	Loss: 0.148673
+Train Epoch: 7 [6528/8405 (77%)]	Loss: 0.070113
+================================================================
+Train: Average loss: 0.1291, Accuracy: 8072/8405 (96%)
+Test: Average loss: 0.1430, Accuracy: 889/934 (95%)
+================================================================
+Saving resnet model 'resnet-mal-std7' ...
+Save Complete. Next Epoch ...
+Train Epoch: 8 [128/8405 (2%)]	Loss: 0.143997
+Train Epoch: 8 [6528/8405 (77%)]	Loss: 0.141144
+================================================================
+Train: Average loss: 0.1142, Accuracy: 8101/8405 (96%)
+Test: Average loss: 0.1188, Accuracy: 896/934 (96%)
+================================================================
+Saving resnet model 'resnet-mal-std8' ...
+Save Complete. Next Epoch ...
+Train Epoch: 9 [128/8405 (2%)]	Loss: 0.143698
+Train Epoch: 9 [6528/8405 (77%)]	Loss: 0.096736
+================================================================
+Train: Average loss: 0.1153, Accuracy: 8059/8405 (96%)
+Test: Average loss: 0.1121, Accuracy: 898/934 (96%)
+================================================================
+Saving resnet model 'resnet-mal-std9' ...
+Save Complete. Next Epoch ...
+Train Epoch: 10 [128/8405 (2%)]	Loss: 0.094215
+Train Epoch: 10 [6528/8405 (77%)]	Loss: 0.034314
+================================================================
+Train: Average loss: 0.1417, Accuracy: 8068/8405 (96%)
+Test: Average loss: 0.1420, Accuracy: 893/934 (96%)
+================================================================
+Saving resnet model 'resnet-mal-std10' ...
+Save Complete. Next Epoch ...
+Train Epoch: 11 [128/8405 (2%)]	Loss: 0.126395
+Train Epoch: 11 [6528/8405 (77%)]	Loss: 0.056270
+================================================================
+Train: Average loss: 0.1057, Accuracy: 8173/8405 (97%)
+Test: Average loss: 0.1220, Accuracy: 905/934 (97%)
+================================================================
+Saving resnet model 'resnet-mal-std11' ...
+Save Complete. Next Epoch ...
+Train Epoch: 12 [128/8405 (2%)]	Loss: 0.109892
+Train Epoch: 12 [6528/8405 (77%)]	Loss: 0.121983
+================================================================
+Train: Average loss: 0.0825, Accuracy: 8199/8405 (98%)
+Test: Average loss: 0.0876, Accuracy: 904/934 (97%)
+================================================================
+Saving resnet model 'resnet-mal-std12' ...
+Save Complete. Next Epoch ...
+Train Epoch: 13 [128/8405 (2%)]	Loss: 0.093401
+Train Epoch: 13 [6528/8405 (77%)]	Loss: 0.055887
+================================================================
+Train: Average loss: 0.0833, Accuracy: 8206/8405 (98%)
+Test: Average loss: 0.0952, Accuracy: 910/934 (97%)
+================================================================
+Saving resnet model 'resnet-mal-std13' ...
+Save Complete. Next Epoch ...
+Train Epoch: 14 [128/8405 (2%)]	Loss: 0.071522
+Train Epoch: 14 [6528/8405 (77%)]	Loss: 0.101260
+================================================================
+Train: Average loss: 0.0699, Accuracy: 8238/8405 (98%)
+Test: Average loss: 0.0799, Accuracy: 911/934 (98%)
+================================================================
+Saving resnet model 'resnet-mal-std14' ...
+Save Complete. Next Epoch ...
+Train Epoch: 15 [128/8405 (2%)]	Loss: 0.031060
+Train Epoch: 15 [6528/8405 (77%)]	Loss: 0.081020
+================================================================
+Train: Average loss: 0.0806, Accuracy: 8165/8405 (97%)
+Test: Average loss: 0.1007, Accuracy: 900/934 (96%)
+================================================================
+Saving resnet model 'resnet-mal-std15' ...
+Save Complete. Next Epoch ...
+Train Epoch: 16 [128/8405 (2%)]	Loss: 0.055487
+Train Epoch: 16 [6528/8405 (77%)]	Loss: 0.154539
+================================================================
+Train: Average loss: 0.0720, Accuracy: 8241/8405 (98%)
+Test: Average loss: 0.0770, Accuracy: 915/934 (98%)
+================================================================
+Saving resnet model 'resnet-mal-std16' ...
+Save Complete. Next Epoch ...
+Train Epoch: 17 [128/8405 (2%)]	Loss: 0.100401
+Train Epoch: 17 [6528/8405 (77%)]	Loss: 0.022045
+================================================================
+Train: Average loss: 0.0677, Accuracy: 8221/8405 (98%)
+Test: Average loss: 0.0878, Accuracy: 909/934 (97%)
+================================================================
+Saving resnet model 'resnet-mal-std17' ...
+Save Complete. Next Epoch ...
+Train Epoch: 18 [128/8405 (2%)]	Loss: 0.106921
+Train Epoch: 18 [6528/8405 (77%)]	Loss: 0.132889
+================================================================
+Train: Average loss: 0.0673, Accuracy: 8221/8405 (98%)
+Test: Average loss: 0.0873, Accuracy: 912/934 (98%)
+================================================================
+Saving resnet model 'resnet-mal-std18' ...
+Save Complete. Next Epoch ...
+Train Epoch: 19 [128/8405 (2%)]	Loss: 0.087124
+Train Epoch: 19 [6528/8405 (77%)]	Loss: 0.050235
+================================================================
+Train: Average loss: 0.0632, Accuracy: 8242/8405 (98%)
+Test: Average loss: 0.0863, Accuracy: 911/934 (98%)
+================================================================
+Saving resnet model 'resnet-mal-std19' ...
+Save Complete. Next Epoch ...
+Train Epoch: 20 [128/8405 (2%)]	Loss: 0.076643
+Train Epoch: 20 [6528/8405 (77%)]	Loss: 0.071666
+================================================================
+Train: Average loss: 0.1020, Accuracy: 8115/8405 (97%)
+Test: Average loss: 0.1377, Accuracy: 889/934 (95%)
+================================================================
+Saving resnet model 'resnet-mal-std20' ...
+Save Complete. Next Epoch ...
+Train Epoch: 21 [128/8405 (2%)]	Loss: 0.104538
+Train Epoch: 21 [6528/8405 (77%)]	Loss: 0.078321
+================================================================
+Train: Average loss: 0.0787, Accuracy: 8239/8405 (98%)
+Test: Average loss: 0.0936, Accuracy: 915/934 (98%)
+================================================================
+Saving resnet model 'resnet-mal-std21' ...
+Save Complete. Next Epoch ...
+Train Epoch: 22 [128/8405 (2%)]	Loss: 0.063827
+Train Epoch: 22 [6528/8405 (77%)]	Loss: 0.154118
+================================================================
+Train: Average loss: 0.0623, Accuracy: 8222/8405 (98%)
+Test: Average loss: 0.0872, Accuracy: 906/934 (97%)
+================================================================
+Saving resnet model 'resnet-mal-std22' ...
+Save Complete. Next Epoch ...
+Train Epoch: 23 [128/8405 (2%)]	Loss: 0.052160
+Train Epoch: 23 [6528/8405 (77%)]	Loss: 0.077333
+================================================================
+Train: Average loss: 0.0595, Accuracy: 8271/8405 (98%)
+Test: Average loss: 0.0759, Accuracy: 914/934 (98%)
+================================================================
+Saving resnet model 'resnet-mal-std23' ...
+Save Complete. Next Epoch ...
+Train Epoch: 24 [128/8405 (2%)]	Loss: 0.123380
+Train Epoch: 24 [6528/8405 (77%)]	Loss: 0.043378
+================================================================
+Train: Average loss: 0.0603, Accuracy: 8243/8405 (98%)
+Test: Average loss: 0.0798, Accuracy: 915/934 (98%)
+================================================================
+Saving resnet model 'resnet-mal-std24' ...
+Save Complete. Next Epoch ...
+Train Epoch: 25 [128/8405 (2%)]	Loss: 0.067137
+Train Epoch: 25 [6528/8405 (77%)]	Loss: 0.077665
+================================================================
+Train: Average loss: 0.0683, Accuracy: 8193/8405 (97%)
+Test: Average loss: 0.0898, Accuracy: 905/934 (97%)
+================================================================
+Saving resnet model 'resnet-mal-std25' ...
+Save Complete. Next Epoch ...
+Training Complete. Exiting ...

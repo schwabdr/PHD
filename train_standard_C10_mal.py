@@ -40,6 +40,7 @@ from models.resnet_new import ResNet18
 args = config.Configuration().getArgs()
 
 args.epochs = 25
+args.batch_size = 128 #16 was from the small GPU on paperspace
 
 '''
 Function to find some information about our dataset.
@@ -154,11 +155,11 @@ def main():
     stats = ((0.4454, 0.4454, 0.4454), (0.3122, 0.3122, 0.3122)) #mean and stdev
     
     
-    # setup data loader
+    # setup data loader 224x224 is the original work so we stick with that.
     trans_train = transforms.Compose([
-        #transforms.RandomCrop(32, padding=4, padding_mode='reflect'),
-        #transforms.RandomHorizontalFlip(),
         transforms.Resize((224,224)),
+        transforms.RandomCrop(224, padding=10, padding_mode='reflect'),
+        transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize(*stats, inplace=False) #original code was True here from MIAT - not sure why, just making a note
     ])
@@ -173,9 +174,9 @@ def main():
     #split dataset 90% train, 10% test
     subsets_dataset = torch.utils.data.random_split(full_dataset, [8405, 934], generator=torch.Generator().manual_seed(42)) #still the best seed ever
 
-    #data loaders
-    train_loader = DataLoader(subsets_dataset[0],batch_size=16, num_workers=8, shuffle=True)
-    test_loader = DataLoader(subsets_dataset[1],batch_size=16, num_workers=8, shuffle=False)
+    #data loaders [0] is train, [1] is test
+    train_loader = DataLoader(subsets_dataset[0],batch_size=args.batch_size, num_workers=8, shuffle=True)
+    test_loader = DataLoader(subsets_dataset[1],batch_size=args.batch_size, num_workers=8, shuffle=False)
 
     resnet = ResNet18(25) #25 classes
 
@@ -204,7 +205,7 @@ def main():
         name = model_name + str(epoch)
         print(f"Saving resnet model '{name}' ...")
         utils.save_model(model, name)
-        print("Save Complete. Exiting ...")
+        print("Save Complete. Next Epoch ...")
 
     print(f"Training Complete. Exiting ...")
 
