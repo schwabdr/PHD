@@ -33,7 +33,7 @@ class Configuration:
         self.parser.add_argument('--SAVE-MODEL-PATH', type=str, help='path to save trained models to', default='./models/saved/')
 
         self.parser.add_argument('--batch-size', type=int, default=256, metavar='N', help='input batch size for training (default: 128)')
-        self.parser.add_argument('--epochs', type=int, default=100, metavar='N', help='number of epochs to train')
+        self.parser.add_argument('--epochs', type=int, default=40, metavar='N', help='number of epochs to train')
         self.parser.add_argument('--weight-decay', '--wd', default=2e-4, type=float, metavar='W')
         self.parser.add_argument('--lr', type=float, default=1e-1, metavar='LR', help='learning rate')
         self.parser.add_argument('--momentum', type=float, default=0.9, metavar='M', help='SGD momentum')
@@ -67,7 +67,7 @@ class Configuration:
         self.parser.add_argument('--va-mode', choices=['nce', 'fd', 'dv'], default='dv')
         self.parser.add_argument('--va-fd-measure', default='JSD')
         self.parser.add_argument('--va-hsize', type=int, default=2048)
-        self.parser.add_argument('--is_internal', type=bool, default=False)
+        self.parser.add_argument('--is_internal', type=bool, default=False) #default was False both lines
         self.parser.add_argument('--is_internal_last', type=bool, default=False)
 
         #from train_MIAT_alpha
@@ -82,7 +82,7 @@ class Configuration:
 
 
 
-        self.stats = ((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)) #mean and stdev
+        self.stats = ((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)) #mean and stdev for C10
 
     def getArgs(self):
         return self.parser.parse_args()

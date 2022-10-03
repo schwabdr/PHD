@@ -39,8 +39,8 @@ from models.resnet_new import ResNet18
 
 args = config.Configuration().getArgs()
 
-args.epochs = 25
-args.batch_size = 128 #16 was from the small GPU on paperspace
+args.epochs = 100
+args.batch_size = 64 #16 was from the small GPU on paperspace
 
 '''
 Function to find some information about our dataset.
@@ -158,8 +158,8 @@ def main():
     # setup data loader 224x224 is the original work so we stick with that.
     trans_train = transforms.Compose([
         transforms.Resize((224,224)),
-        transforms.RandomCrop(224, padding=10, padding_mode='reflect'),
-        transforms.RandomHorizontalFlip(),
+        #transforms.RandomCrop(224, padding=10, padding_mode='reflect'),
+        #transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize(*stats, inplace=False) #original code was True here from MIAT - not sure why, just making a note
     ])
@@ -189,7 +189,7 @@ def main():
     optimizer = optim.Adagrad(model.parameters(), lr=args.lr)
 
     #now we begin the actual training
-    model_name = 'resnet-mal-std'
+    model_name = 'resnet-mal-std-'
     for epoch in range(1, args.epochs + 1):
         # adjust learning rate for SGD
         adjust_learning_rate(optimizer, epoch) #inefficient to call this every epoch?

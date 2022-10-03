@@ -58,8 +58,8 @@ def show_grid(x, y, name):
             #pred_ind = pred_adv[i]
             #axes1[j][k+1].text(0,0,classes[pred_ind])
     plt.show()
-    plt.savefig(name, format='png')    
-
+    plt.savefig(name, format='png')
+    
 def open_adv_examples():
     print(f"Opening adv examples and printing random")
     #i'm not normalizing here since I want to display

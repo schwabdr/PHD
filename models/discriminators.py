@@ -140,7 +140,7 @@ class MIInternallastConvNet(nn.Module):
             nn.Conv2d(n_units, n_units, kernel_size=1, stride=1, padding=0, bias=False))
 
         # initialize shortcut to be like identity (if possible)
-
+        
     def forward(self, x):
         """
 
@@ -151,7 +151,8 @@ class MIInternallastConvNet(nn.Module):
                 torch.Tensor: network output.
 
         """
-
+        #print(self.block_nonlinear(x).size())
+        #print(self.linear_shortcut(x).size())
         h = self.block_ln(self.block_nonlinear(x) + self.linear_shortcut(x))
         return h
 

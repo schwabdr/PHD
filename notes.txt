@@ -65,6 +65,10 @@ https://github.com/kuangliu/pytorch-cifar/issues/19
 Standarization (this is what I really did)
 https://machinelearningmastery.com/how-to-normalize-center-and-standardize-images-with-the-imagedatagenerator-in-keras/
 
+################ MalImage ########################
+MIAT models trained with PGD with 50 iterations and eps as shown (.03, .1, .25)
+Train for 40 epochs
+
 
 
 ################## CONDA ENVIRONMENT ##################
