@@ -1,4 +1,11 @@
 '''
+10/7/22
+Using this file for my data for what should be eval_tests_03_target.py - I can't get that file to work properly, 
+but this file seems to be set up so I'm going to use it.
+great results (25% acc) was achieved with using the STD model as encoder, and MIAT.03 as Target.
+Going to try using STD as both.
+
+
 9/2/22
 I had an epiphany of sorts - the reason loss_ce works so well is that by definition if you increase the loss for 
 the true class, you will reduce the loss for the other classes. This is not true of loss_mi.
@@ -83,7 +90,7 @@ This should be wrapped up in a utils file or something ... but for now I'll just
 
 '''
 def MI_loss_test01(model_fns, x_natural, x_adv, y_true, x_target=None, y_target=None, iter=iter):
-    #this setting 
+    # 
     # typical layout for model_fns
     #               0        1         2        3         4        5
     #model_fns = {std_res, miat_res, local_n, global_n, local_a, global_a}
@@ -158,7 +165,7 @@ def MI_loss_test01(model_fns, x_natural, x_adv, y_true, x_target=None, y_target=
         
      
     #loss_all = loss_ce + torch.tensor(alpha).cuda() * loss_mi
-    print(f"loss_all: {loss_all}, loss_ce: {loss_ce}, loss_mea_n: {loss_mea_n}, loss_mea_a: {loss_mea_a}, loss_a_all: {loss_a_all}, euc_n: {loss_euclid_mea_n}, euc_a: {loss_euclid_mea_a}")
+    print(f"iter: {iter}, loss_all: {loss_all}, loss_ce: {loss_ce}, loss_mea_n: {loss_mea_n}, loss_mea_a: {loss_mea_a}, loss_a_all: {loss_a_all}, euc_n: {loss_euclid_mea_n}, euc_a: {loss_euclid_mea_a}")
     return loss_all
 
 '''
@@ -928,8 +935,8 @@ def eval_loss(model_fns, device, test_loader):
     acc_adv = []
 
     #this is our L_infty constraint - added 1.5+ 
-    #eps_lst = [.025, .05, .075, .1, .125, .15, .175, .2, .25, .3, .4, .5, .75, 1.] #, 1.5, 2., 2.5] #stopping at 1
-    eps_lst = [.15]
+    eps_lst = [.025, .05, .075, .1, .125, .15, .175, .2, .25, .3, .4, .5, .75, 1.] #, 1.5, 2., 2.5] #stopping at 1
+    #eps_lst = [.15]
 
     for eps in eps_lst:
         print(25*'=')
@@ -1034,7 +1041,10 @@ def main():
     global_a = MI1x1ConvNet(z_size, args.va_hsize)
 
     std_res_name = 'resnet-new-100' 
-    miat_res_name = 'resnet-new-100-MIAT-from-scratch'
+    #miat_res_name = 'resnet-new-100-MIAT-from-scratch'
+    #miat_res_name = 'resnet-new-100-MIAT-0.25-from-scratch'
+    # a bit 'hacky' here to get it to work without changing too much code.
+    miat_res_name = 'resnet-new-100' #not technically a MIAT model - but it will drop in where it needs to in the code.
     l_n = 'local_n.5'
     g_n = 'global_n.5'
     l_a = 'local_a.5'
@@ -1049,6 +1059,11 @@ def main():
     
     print(f"Resnet Models Loaded: {std_res_name} {miat_res_name}")
     print(f"Estimator Models Loaded: {l_n} {g_n} {l_a} {g_a}")
+    print(f"Target: MIAT Model, Encoder: STD Model")
+    print(f"This is eval_tests03 - but from - loss_study_targeted.py")
+    print(f"I've found that MI-Craft non-target then target doesn't work with the STD model")
+    print(f"So I'll only evaluate the MIAT models.")
+    print(f"addendum: this time I am evaluating the std model")
     
     std_res = torch.nn.DataParallel(std_res).cuda()
     miat_res = torch.nn.DataParallel(miat_res).cuda()

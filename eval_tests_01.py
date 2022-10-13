@@ -2,6 +2,9 @@
 Purpose of this file is to evaluate any given model with adversarial examples given by any model.
 Both models can be the same for a white box evaluation.
 We will test all three MIAT/NAMID models using a range of epsilon values and nb_iter = 100 in all cases.
+
+10/13/22 Update - Going to add a function that will print some samples for me to choose from 
+so I can make a grid of all the different attacks - I think they will look the same but I don't know!
 '''
 import os
 import argparse
@@ -30,7 +33,6 @@ classes = ['plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship'
 args = config.Configuration().getArgs()
 stats = config.Configuration().getNormStats()
 
-#args.batch_size=512 #trying this
 args.batch_size=2048 #trying this - this works with the data parallel - GPU util ~95%, memory 10800/11019 MB each GPU
 
 '''
@@ -189,5 +191,36 @@ def main():
         for y in x:
             print(y)
 
+def print_examples():
+    print("Beginning Evaluation ...")
+
+    use_cuda = not args.no_cuda and torch.cuda.is_available()
+
+    device = torch.device("cuda" if use_cuda else "cpu")
+
+    name = 'resnet-new-100' #input("Name of model to load: ") #for now I'll hard code the only model I have trained
+    
+    model = ResNet18(10)
+   
+    model.load_state_dict(torch.load(os.path.join(args.SAVE_MODEL_PATH, name)))
+    model.to(device)
+    model = torch.nn.DataParallel(model).cuda() 
+    model.eval()
+
+    print(f"Model loaded: {name}")
+    
+    trans_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(*stats)
+    ])
+
+    testset = data.data_dataset(img_path=args.nat_img_test, clean_label_path=args.nat_label_test, transform=trans_test)
+    test_loader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, drop_last=False, shuffle=False,
+                                              num_workers=4, pin_memory=True)
+    
+    
+   
+
 if __name__ == '__main__':
-    main()
+    #main()
+    print_examples()
