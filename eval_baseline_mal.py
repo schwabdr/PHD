@@ -62,6 +62,7 @@ def main():
     use_cuda = not args.no_cuda and torch.cuda.is_available()
 
     device = torch.device("cuda" if use_cuda else "cpu")
+    print(f"device: {device}")
 
     #set the model name here you want to evaluate
     #name = 'resnet-mal-std-aug-100' #input("Name of model to load: ") #for now I'll hard code 
