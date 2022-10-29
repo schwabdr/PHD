@@ -1,4 +1,3 @@
-from distutils.command.clean import clean
 import os
 import numpy as np
 from PIL import Image
