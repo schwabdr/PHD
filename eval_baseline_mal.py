@@ -25,7 +25,7 @@ from models.resnet_new import ResNet18
 args = config.Configuration().getArgs()
 stats = ((0.4454, 0.4454, 0.4454), (0.3122, 0.3122, 0.3122)) #mean and stdev
 
-args.batch_size=64
+args.batch_size=48
 
 
 '''
@@ -65,8 +65,11 @@ def main():
     print(f"device: {device}")
 
     #set the model name here you want to evaluate
-    #name = 'resnet-mal-std-aug-100' #input("Name of model to load: ") #for now I'll hard code 
-    name = 'resnet-mal-MIAT-AT.25.40' #input("Name of model to load: ") #for now I'll hard code 
+    #name = 'resnet-mal-std-100' #97% on .03 adv set, 30-32% on .25 adv set.
+    #name = 'resnet-mal-std-aug-100' # approx 14% robust acc on .25 adv set
+    #name = 'resnet-mal-MIAT.25' # ~ 75% on all counts for .25 adv set!!!
+    name = 'resnet-mal-MIAT-AT.25.40' #GOOD ONE 94% ACC on .03 adv set, ~73% on .25 adv set
+    
     model = ResNet18(25)
     path = str(os.path.join(args.SAVE_MODEL_PATH, name))
     

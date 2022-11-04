@@ -337,7 +337,10 @@ def main():
         transforms.Normalize(*stats, inplace=False)
     ])
     '''
+    #putting a note in here for later - I *believe* the training here actually DID use the transforms.Normalize()
+    #evidience is when I don't use the .Normalize function in eval_baseline, I get very poor results.
     # images are already resized on disk as npy arrays
+    #I should have taken better notes.
     trans = transforms.Compose([
         transforms.Resize((224,224)), #don't think I need this?
         transforms.ToTensor(),
