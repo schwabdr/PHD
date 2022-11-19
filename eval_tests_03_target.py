@@ -551,7 +551,7 @@ def eval_loss(model_fns, device, test_loader, loss_fn):
         eps_iter = .005
         #eps_iter = .005
         #nb_iter = round(eps/eps_iter) + 10
-        nb_iter = 60
+        nb_iter = 150
         print(f"Using PGD with eps: {eps}, eps_iter: {eps_iter}, nb_iter: {nb_iter}")
         #with torch.no_grad():
         i = 0
@@ -560,9 +560,9 @@ def eval_loss(model_fns, device, test_loader, loss_fn):
             print(f"batch number {i}, {i*args.batch_size} / {len(test_loader.dataset)}")
             x_natural, y_true = x_natural.to(device), y_true.to(device)
             output = target_model_fn(x_natural) #fwd pass
-            top2 = torch.topk(output, 10) # get values / indices for top 2 classes
-            #y_target = torch.select(top2.indices, 1, 1) #y_target is second most likely class
-            y_target = torch.select(top2.indices, 1, 9) #y_target is least likely class
+            top2 = torch.topk(output, 2) # get values / indices for top 2 classes
+            y_target = torch.select(top2.indices, 1, 1) #y_target is second most likely class
+            #y_target = torch.select(top2.indices, 1, 9) #y_target is least likely class
             #y_target2 = torch.argmin(output, 0, keepdim=True)
             #print(f"y_true[0]: {y_true[0]}")
             #print(f"y_target[0]: {y_target[0]}")

@@ -52,7 +52,7 @@ args.batch_size= 40
 
 
 def show_img_grid(rows, cols, x, x_adv, y, y_adv,inds=None,fname=None):
-    fig, axes1 = plt.subplots(rows,cols,figsize=(25,25))
+    fig, axes1 = plt.subplots(rows,cols,figsize=(5,5))
     if inds is None: #pick random indices
         a = list(range(0, len(x)))
         random.shuffle(a)
@@ -249,10 +249,9 @@ def display_examples():
     
     device = torch.device("cuda")
     
+    model_names = ['resnet-mal-std-100', 'resnet-mal-std-aug-100', 'resnet-mal-MIAT.25', 'resnet-mal-MIAT-AT.25.40']
+    #model_names = ['resnet-mal-std-100'] #quick test
 
-
-    #model_names = ['resnet-new-100', 'resnet-new-100-MIAT-from-scratch', 'resnet-new-100-MIAT-0.1-from-scratch', 'resnet-new-100-MIAT-0.25-from-scratch']
-    model_names = ['resnet-mal-std-100']
     trans_test = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize(*stats)
@@ -295,8 +294,8 @@ def display_examples():
                 output = model(data)
                 top2 = torch.topk(output, 2) # this is for a targeted attack
                 y_target = torch.select(top2.indices, 1, 1) #y_target is second most likely class
-                data_adv = pgd(model, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=None, targeted=False) #NON_targeted attack
-                #data_adv = pgd(model, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=y_target, targeted=True) #targeted attack
+                #data_adv = pgd(model, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=None, targeted=False) #NON_targeted attack
+                data_adv = pgd(model, data, eps=eps, eps_iter=eps_iter, nb_iter=nb_iter, norm=np.inf, y=y_target, targeted=True) #targeted attack
 
                 # here I'll have to look back at some old code for stacking np images together to show in a grid
                 #x_adv = data_adv.detach().cpu().numpy().transpose(0,2,3,1) #I'll use this later - gonna paste all the images together.
@@ -323,9 +322,14 @@ def display_examples():
                 y_test_adv = y_test_adv.reshape((args.batch_size))
 
                 print(f"y_test: {y_test}")
-                fname = os.path.join('./results/imgs/', str(eps) + '-batch-' + str(batch_num) + '.PNG') #T is for targeted attack, remove for non-targeted
-                inds = [5, 2, 36, 1, 38, 14] # hate hard coding magic numbers - these are the indicies of the classes I want in batch 7.
-                show_img_grid(1,12, x_test_clean, x_test_adv, y_test, y_test_adv, inds=inds, fname=fname)
+                #following lines are for the grid using a single method
+                #fname = os.path.join('./results/imgs/', str(eps) + '-batch-' + str(batch_num) + '.PNG') #T is for targeted attack, remove for non-targeted
+                #inds on next line: inds for the examples from the original paper 
+                #inds = [5, 2, 36, 1, 38, 14] # hate hard coding magic numbers - these are the indicies of the classes I want in batch 7.
+                #show_img_grid(1,12, x_test_clean, x_test_adv, y_test, y_test_adv, inds=inds, fname=fname)
+                fname = os.path.join('./results/imgs/', str(eps) + '-' + name + '-PGD-CE-T.PNG') #T is for targeted attack, remove for non-targeted
+                inds = [2] # hate hard coding magic numbers - these are the indicies of the classes I want in batch 7.
+                show_img_grid(1,2, x_test_clean, x_test_adv, y_test, y_test_adv, inds=inds, fname=fname)
 
                 break
             
@@ -333,5 +337,6 @@ def display_examples():
         
 
 if __name__ == '__main__':
-    main() # use for PGD-CE Mal data in tables in Ch5
-    #display_examples() # use to display the grid used in ch 4
+    #main() # use for PGD-CE Mal data in tables in Ch5
+    display_examples() # use to display the grid used in ch 4
+    #also use display_examples to get the large grid used in CH5

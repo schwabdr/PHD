@@ -118,7 +118,7 @@ class data_micraft_dataset(Data.Dataset):
         img_clean = Image.fromarray(img_clean)
         img_target = Image.fromarray(img_target)
         
-        if self.augment:
+        if self.augment: #note this wouldn't work for MalImg
             # Resize
             resize = transforms.Resize(size=(36,36))
             img_clean = resize(img_clean)
@@ -142,3 +142,44 @@ class data_micraft_dataset(Data.Dataset):
 
     def __len__(self):
         return self.length
+
+
+
+'''
+The purpose of this class is to return a list of images and labels.
+One img/label for each class.
+
+These are all clean images / labels.
+'''
+class data_mal_sample_dataset(Data.Dataset):
+    def __init__(self, img_path, clean_label_path, transform=None):
+        self.train_data = np.load(img_path)
+        self.train_labels = np.load(clean_label_path).astype(np.float32)
+        self.train_labels = torch.from_numpy(self.train_labels).long()
+        
+        self.transform=transform
+        self.length = len(self.train_data)
+    
+    def __getitem__(self, index):
+        imgs = []
+        labels = []
+        for tar in range(25):
+            j = 0
+            while tar != self.train_labels[j]:
+                j += 1
+            #now we have the index for the correct img / label
+            img = Image.fromarray(self.train_data[j])
+            if self.transform is not None: #performs normalization
+                img = self.transform(img)
+
+            imgs.append(img)
+            labels.append(self.train_labels[j])
+            #move to the next target
+
+        
+        return imgs, labels
+
+    def __len__(self):
+        return self.length
+
+
